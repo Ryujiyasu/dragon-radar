@@ -1,0 +1,26 @@
+idf_component_register(
+    SRCS
+        "main.c"
+        "display_init.c"
+        "ui/radar_view.c"
+        "ui/theme.c"
+        "uwb/uwb_uart.c"
+        "uwb/uwb_filter.c"
+        "game/game_state.c"
+        "audio/audio_player.c"
+        "storage/sd_card.c"
+    INCLUDE_DIRS
+        "."
+        "ui"
+        "uwb"
+        "game"
+        "audio"
+        "storage"
+    REQUIRES
+        driver
+        esp_timer
+        esp_lcd
+        nvs_flash
+        fatfs
+        sdmmc
+)
