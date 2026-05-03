@@ -1,37 +1,110 @@
-# Dragon Radar UWB - 開発指示書
+# Dragon Radar UWB - 開発指示書 (Path C / 二段構え版)
 
-DigiKey Make ONE Challenge 2026 応募作品。村田UWB EVK + Waveshare ESP32-S3-Touch-LCD-1.85 でドラゴンレーダー風の宝探しデバイスを作る。子供と公園で7個のタグを探し、全部集めると神龍が召喚されてウーロンが「ギャルのパンティおくれーっ」と叫ぶ。
+DigiKey Make ONE Challenge 2026 応募作品。Murata UWB EVK + Waveshare ESP32-S3-Touch-LCD-1.85 でドラゴンレーダー風の宝探しデバイスを作る。子供と公園で 2-7 個のタグを探し、全部集めると神龍が召喚されてウーロンが「ギャルのパンティおくれーっ」と叫ぶ。
 
-応募締切: **2026年6月22日 23:59**
-GW集中開発期間: **4/29(水) - 5/4(月)**
-本ドキュメントはClaude Codeへの開発指示書として使用する。
+応募締切: **2026-06-22 23:59** (残り ~50日 / 起算 2026-05-03)
+GW 残り集中期間: 5/3 (日) - 5/4 (月)
+本ドキュメントは Claude Code への開発指示書として使用する。
+
+---
+
+## 採用方針: **Path C** (QN9090 ファーム書換え)
+
+### Path 比較サマリ (詳細別途検討済)
+
+| Path | 概要 | 採否 | 理由 |
+|---|---|---|---|
+| Path A | Murata プリビルド FW のまま | ❌ | 2DK が Initiator 固定でタグにできない |
+| Path B | QN9090 erase + ESP32 が SR150 を SPI 直叩き | ❌ (今回) | 工数大、2BP 1個で破壊リスク高 |
+| **Path C** | **QN9090 にカスタム FW、ESP32 ↔ QN9090 は UART** | ✅ **採用** | 工数中、ハード改造ゼロ、戻せる |
+
+### 二段構え戦略
+
+```
+[Stage 1] 5月中: Path C で実装 → 6/22 応募 (実演 2 タグ + 演出で 7 タグ)
+[Stage 2] 7-8月: Path B (ESP32 で SR150 を直接制御) に移植チャレンジ
+[Stage 3] 9/5-6: Maker Faire Tokyo 2026 出展 (進化版)
+```
 
 ---
 
 ## ハードウェア構成
 
-| 役割 | 型番 | 数量 | 備考 |
-|------|------|------|------|
-| メインデバイス | Waveshare ESP32-S3-Touch-LCD-1.85 | 1 | ESP32-S3 + 1.85" 丸型 LCD (360×360, ST77916 driver), 静電容量タッチ, USB-C, microSD, I2S audio |
-| UWB マスター | Murata Type 2BP EVK (LBUA0VG2BP-EVK-P) | 1 | QN9090 MCU + UWB, 距離+AoA 計算, UART 出力 |
-| UWB タグ | Murata Type 2DK EVK (LBUA2ZZ2DK-EVK) | 2 (→最終7) | 探す対象（ドラゴンボール7個に相当） |
+### 現有機材 (2026-05-03 時点)
 
-## システムアーキテクチャ
+| 役割 | 型番 | 数 | 状態 / 備考 |
+|------|------|---|------|
+| プレイヤー機 UI | Waveshare ESP32-S3-Touch-LCD-1.85 | 1 | ESP32-S3 + 1.85" 丸型 LCD (360×360, ST77916), 静電容量タッチ, USB-C, microSD, I2S audio |
+| プレイヤー機 UWB | Murata Type 2BP EVK (LBUA0VG2BP-EVK-P) | 1 | NXP **SR150** (距離+AoA可) + QN9090 MCU。Path C では QN9090 にカスタム FW を焼く |
+| タグ #1, #2 | Murata Type 2DK EVK (LBUA2ZZ2DK-EVK) | 2 | NXP **SR040** (距離のみ) + QN9090 MCU。CR2032 駆動可、隠して放置できる。Path C で Responder 化 |
+| デバッガ/SWD 書込 | NXP MCU-Link Pro | 1 | QN9090 へのカスタム FW 書込用、Bridge UART/Target Power 機能あり |
+| 用途未確定 | EA-WO1391-1228 (Embedded Artists 系?) | 1 | Phase 0 で正体特定すること |
+
+### 機材についての追記
+- 2BP EVK のヘッダピン (10ピン×2列) が一部曲がっているが、**Path C では USB ケーブルのみで動作するため影響なし**
+- 2BP EVK は **1 個しか保有しない方針** (高価なため、破損時のみ追加発注)
+- 2DK EVK の追加 5 個は **6/22 応募後 (7月頃) に発注予定** (Maker Faire 7 タグ拡張用)
+
+### 9月 Maker Faire 用追加発注 (7月予定)
+
+| 部品 | 数 | 概算 |
+|---|---|---|
+| 2DK EVK 追加 | 5 | ~$450 |
+| (オプション) 自作タグ PCB 部品一式 | 1 セット | ~$300 |
+
+---
+
+## システムアーキテクチャ (Path C)
 
 ```
-[2DK タグ × N] ←UWB→ [2BP マスター/QN9090] ←UART→ [ESP32-S3 / Waveshare] ─┬─ 丸型LCD (LVGL)
-                                                                           ├─ I2S Audio (神龍/ウーロン)
-                                                                           └─ microSD (WAV/PNG asset)
+[ プレイヤー機 (筐体内部) ]
+┌─────────────────────────────────────────────┐
+│ Waveshare ESP32-S3-Touch-LCD-1.85          │
+│  ├─ LVGL UI (丸型レーダー)                  │
+│  ├─ ゲームステートマシン                    │
+│  ├─ 音声再生 (I2S)                         │
+│  ├─ microSD (asset)                         │
+│  └─ UART パーサ (シンプル ASCII)            │
+└──────┬──────────────────────────────────────┘
+       │ UART or USB-CDC
+       │ "RANGE" → "OK TAG1:1234,30,−5 TAG2:2100,−15,40"
+       ▼
+┌─────────────────────────────────────────────┐
+│ Murata Type 2BP EVK                         │
+│  ├─ QN9090 MCU ← カスタム FW (我々が書く)   │
+│  │   - NXP UWBIOT SDK ベース               │
+│  │   - UCI Host stack (NXP 提供)           │
+│  │   - 自作 ASCII コマンド I/F             │
+│  │   - 1:N (round-robin) ranging           │
+│  └─ SR150 UWB IC (Murata 校正済)           │
+└─────────────────────────────────────────────┘
+                ↑ UWB 電波
+                │
+[ タグ × 2 (公園に隠す)、各々独立動作 ]
+┌──────────────────────┐  ┌──────────────────────┐
+│ Murata Type 2DK EVK  │  │ Murata Type 2DK EVK  │
+│  ├─ QN9090 ← Responder FW │  │  ├─ QN9090 ← Responder FW │
+│  └─ SR040 UWB IC     │  │  └─ SR040 UWB IC     │
+│  ├─ CR2032 電池駆動   │  │  ├─ CR2032 電池駆動   │
+└──────────────────────┘  └──────────────────────┘
+
+[ 開発・デバッグ時のみ ]
+┌─────────────────────────────────────────────┐
+│ MCU-Link Pro (NXP)                          │
+│  └─ SWD で QN9090 にファーム書込・デバッグ  │
+└─────────────────────────────────────────────┘
 ```
 
-**データフロー**
+### データフロー
 
-1. 2DK タグが UWB ビーコンを発信
-2. 2BP の QN9090 が Two-Way Ranging で距離 (mm)、Angle of Arrival で方位角・仰角 (deg) を計算
-3. 結果を UART で ESP32-S3 に送信 (フォーマットは Phase 1 で確定)
-4. ESP32-S3 が LVGL で極座標レーダーに光点プロット
-5. ゲームロジックが「30cm 以内に N 秒滞在 = 取得」を判定
-6. 7個収集完了で神龍召喚演出 + ウーロン音声 + パンティひらひらアニメ
+1. ESP32 が QN9090 に "RANGE" コマンド送信 (33ms 間隔, 約 30Hz)
+2. QN9090 が **round-robin で 2 タグ (将来 7) を順番に Unicast TWR 実行**
+3. 各タグの距離 (mm) + 方位角 (deg) を集計
+4. QN9090 が ESP32 に "OK TAG1:1234,30 TAG2:2100,-15" のような ASCII レスポンス
+5. ESP32 がパース → LVGL レーダーに光点プロット
+6. ゲームロジックが「30cm 以内に N 秒滞在 = 取得」を判定
+7. **2 個取得時点** で 7 個取得演出に分岐 (動画用) or **7 個取得** (Maker Faire 拡張時)
+8. 神龍召喚演出 + ウーロン音声 + パンティひらひらアニメ
 
 ---
 
@@ -41,270 +114,230 @@ GW集中開発期間: **4/29(水) - 5/4(月)**
 dragon-radar/
 ├── README.md
 ├── firmware/
-│   ├── esp32-s3/                # メイン開発対象 (ESP-IDF)
+│   ├── esp32-s3/                # ESP-IDF プロジェクト (UI + ゲーム + UART parser)
 │   │   ├── main/
 │   │   │   ├── main.c
-│   │   │   ├── ui/              # LVGL レーダー UI
-│   │   │   │   ├── radar_view.c/h
+│   │   │   ├── display_init.c   # ST77916 + LVGL 初期化 (Waveshare driver 取込予定)
+│   │   │   ├── ui/
+│   │   │   │   ├── radar_view.c/h     # LVGL レーダー UI ✅ 5/3 実装済
 │   │   │   │   ├── summon_view.c/h    # 神龍召喚演出
-│   │   │   │   └── theme.c/h          # 色・フォント定義
-│   │   │   ├── uwb/              # 2BP からの UART 受信
-│   │   │   │   ├── uwb_uart.c/h
-│   │   │   │   └── uwb_filter.c/h     # 移動平均・異常値除去
-│   │   │   ├── game/             # ゲーム状態機械
+│   │   │   │   └── theme.c/h           # 色・フォント定義
+│   │   │   ├── uwb/
+│   │   │   │   ├── uwb_uart.c/h        # QN9090 への UART コマンド I/F
+│   │   │   │   └── uwb_filter.c/h      # 移動平均・異常値除去
+│   │   │   ├── game/
 │   │   │   │   └── game_state.c/h
-│   │   │   ├── audio/            # I2S 再生
-│   │   │   │   └── audio_player.c/h
-│   │   │   └── storage/          # SD カードアクセス
+│   │   │   ├── audio/
+│   │   │   │   └── audio_player.c/h    # I2S 再生
+│   │   │   └── storage/
 │   │   │       └── sd_card.c/h
-│   │   ├── components/           # ST77916 driver 等
+│   │   ├── components/                 # ST77916 driver 等
 │   │   ├── CMakeLists.txt
 │   │   ├── sdkconfig.defaults
-│   │   └── partitions.csv        # SPIFFS or FATFS for asset
-│   └── 2bp-config/               # Murata サンプルファームの動作メモ
-│       └── README.md
+│   │   └── partitions.csv
+│   ├── 2bp-fw/                  # ★ Path C で新設: 2BP の QN9090 用カスタム FW
+│   │   ├── README.md            # MCUXpresso での開発手順
+│   │   ├── src/
+│   │   │   ├── main.c                  # FreeRTOS エントリ
+│   │   │   ├── uart_cmd.c/h            # ASCII コマンドパーサ
+│   │   │   ├── ranging.c/h             # round-robin ranging スケジューラ
+│   │   │   └── config.h                # SR150 設定、タグ MAC 一覧
+│   │   └── prj/                  # MCUXpresso プロジェクトファイル
+│   ├── 2dk-fw/                  # ★ Path C で新設: 2DK の QN9090 用 Responder FW
+│   │   ├── README.md
+│   │   ├── src/
+│   │   │   ├── main.c
+│   │   │   └── responder.c/h           # SR040 を Responder として常駐
+│   │   └── prj/
+│   └── 2bp-config/              # Murata 公式ドキュメント (NDA, gitignore)
+│       └── docs/                # 取得済 Murata PDF 25 件
 ├── assets/
-│   ├── audio/                    # VOICEVOX で事前生成
-│   │   ├── search_beep.wav       # ピピピ音
-│   │   ├── found.wav             # タグ取得時
-│   │   ├── shenron_appear.wav    # 神よ…願いを言え…
-│   │   ├── oolong.wav            # ギャルのパンティおくれーっ
-│   │   └── shenron_grant.wav     # よかろう…
-│   └── images/                   # PNG (LVGL 用、RGB565 変換推奨)
-│       ├── star.png              # 集めた数表示用
-│       ├── shenron.png           # 神龍シルエット
-│       └── panty.png             # 落ちてくる演出用
+│   ├── audio/                          # VOICEVOX で事前生成
+│   │   ├── search_beep.wav
+│   │   ├── found.wav
+│   │   ├── shenron_appear.wav
+│   │   ├── oolong.wav
+│   │   └── shenron_grant.wav
+│   └── images/
+│       ├── star.png
+│       ├── shenron.png
+│       └── panty.png
+├── tools/
+│   ├── uart_sniffer.py                  # PC で QN9090 UART を眺めるツール ✅ 5/3 実装済
+│   └── captures/                        # raw キャプチャログ (gitignore)
 └── docs/
-    ├── demo-scenario.md          # 動画台本
-    └── parts-list.md             # myLists 用部品表
+    ├── 2bp-protocol.md                  # 2BP↔ESP32 ASCII プロトコル仕様
+    ├── path-c-architecture.md           # Path C アーキテクチャ詳細
+    ├── demo-scenario.md                 # 動画台本
+    └── parts-list.md                    # myLists 用部品表
 ```
 
 ---
 
-## GW 開発スケジュール (4/29 - 5/4)
+## 開発スケジュール (Path C / 二段構え)
 
-### Phase 1: UART 疎通確認 【4/29 (水) 夜 - 4/30 (木)】
+### 現状 (2026-05-03 時点) ✅ 5/3 達成済み
 
-**目的**: 2BP からの距離・角度データが ESP32-S3 まで届くことを確認する。ここで詰まると全工程が止まる最重要フェーズ。
+- ESP-IDF v5.3.2 インストール
+- `dragon-radar/` プロジェクト初期化
+- ESP-IDF プロジェクトスケルトン (LVGL 9.2 取込、ビルド成功)
+- **Phase 2 (LVGL レーダー UI)** 実装済: ダミーデータで光点が動く
+- Murata PDF 25 件取得 (NDA 配下、gitignore)
+- 2BP/2DK Quick Start Guide 解析、Path C 採用決定
 
-**タスク**
+### Phase 0: 環境準備 + 校正値バックアップ 【5/4 (月)】
 
-1. 2BP の出荷時 demo firmware のドキュメントを Murata の開発者ポータル (https://www.murata.com/products/connectivitymodule/uwb) で確認
-2. 2BP のデバッグ UART ピン (おそらく Arduino ヘッダ上の D0/D1 or 専用ヘッダ) を ESP32-S3 の任意 GPIO に配線
-   - 2BP TX → ESP32 RX (GPIO はピン衝突を確認、UART2 推奨)
-   - 2BP RX → ESP32 TX
-   - **GND 共通必須**
-3. ESP32-S3 で UART2 を初期化 (115200 8N1 で開始、ダメなら 9600 / 921600 を試す)
-4. まず raw bytes をシリアルモニタにダンプ
-5. 2DK タグ電源 ON でデータが流れることを確認
-6. データ形式 (Murata 標準は MAUI = Murata Application UART Interface or NTB シェル) を解析しパーサ実装
-
-**成果物**
-
-- `main/uwb/uwb_uart.c`: UART 受信 + パース実装
-- パース済みデータ構造:
-  ```c
-  typedef struct {
-      uint8_t  tag_id;          // 0x01 〜 0x07
-      uint16_t distance_mm;     // 0 〜 65535
-      int16_t  azimuth_deg;     // -180 〜 +180
-      int16_t  elevation_deg;   // -90 〜 +90
-      uint32_t timestamp_ms;
-      uint8_t  rssi;            // Optional
-  } uwb_measurement_t;
-  ```
-- `idf.py monitor` で `Tag 0x01: 1234mm, az=+30°, el=-5°` のような出力が出る
-
-**詰まりポイントと対処**
-
-- ボーレート不一致 → 順番に試す (9600/115200/460800/921600)
-- 配線が逆 → 2BP/ESP32 とも TX/RX 入れ替えを試す
-- データが何も来ない → 2BP のリセットボタン長押し、USB給電状態確認、2DK の電源確認
-- ASCII で読めない → binary プロトコルかもしれない、まず hex で観察
-- Murata のドキュメントが NDA → サンプルコード (mw-tools or NXP MCUXpresso のサンプル) のシリアル出力部を読む
-
----
-
-### Phase 2: レーダー UI 骨格 【5/1 (金)】
-
-**目的**: LVGL で丸型ディスプレイに動くドラゴンレーダー風 UI を作る。実データはまだ繋がない。
+**目的**: Path C の安全マージン確保。失敗時に元の Murata プリビルド FW に戻せる準備。
 
 **タスク**
 
-1. ESP-IDF v5.3+ プロジェクト作成、LVGL v9.x コンポーネント追加
-2. Waveshare 公式 GitHub から ST77916 driver と GT911 タッチ driver を取得・組込
-3. 360×360 の `lv_disp` 初期化、円形マスク設定 (画面四隅は黒)
-4. 背景レイヤ:
-   - 真っ黒背景 (#000000)
-   - 同心円 3 本 (半径 60, 120, 180 px、蛍光緑 #00FF66, opacity 60%)
-   - 十字ガイド (90度刻み、蛍光緑 opacity 30%)
-5. スイープ線:
-   - 中央から外周への扇形 (`lv_arc`)、1.5 秒/周回で回転
-   - 蛍光緑、opacity が中央→外周で減衰
-6. 光点レイヤ:
-   - 最大7個分の `lv_obj_t *dot[7]` を予め確保
-   - 各タグID に色を割当 (赤/橙/黄/緑/青/紺/紫 = ドラゴンボール7色)
-   - ダミーデータで円周を回転させて動作確認
-7. 集めた数表示:
-   - 画面右上に星アイコン×取得数 (PNG または SVG)
+1. NXP MyAccount 登録 (まだなら)
+2. NXP UWBIOT SDK ダウンロード (SR150 v04.06.00 推奨)
+3. MCUXpresso IDE インストール (QN9090 開発用)
+4. MCU-Link Pro のドライバ確認、PC で認識
+5. **2BP/2DK 各 EVK の QN9090 フラッシュ全領域をダンプ**
+   - `LinkServer flash -p QN9030 read 0x00000000 0x80000 backup_<EVK名>_qn9090.bin`
+   - 校正領域 (IFR) も別途ダンプ
+   - ダンプファイルは `firmware/2bp-config/firmware-backups/` (gitignore) に保管
+6. EA-WO1391-1228 の正体確認 (実物見て M.2 か等)
 
-**成果物**
+**成果物**: `firmware-backups/2bp.bin`, `2dk_1.bin`, `2dk_2.bin`
 
-- `main/ui/radar_view.c`
-- ダミーデータで7個の光点が好き勝手に動くデモ
-- 起動から3秒以内に表示開始
+**詰まりポイント**: NXP MyAccount は登録に時間かかることあり、早めに着手
 
-**LVGL 実装メモ**
+### Phase 1: QN9090 で Murata サンプル動作確認 【5/5-12】
 
-- 光点は毎フレーム再生成せず、`lv_obj_set_pos()` で座標更新のみ
-- 距離→半径マッピングは log スケール推奨: `r = 180 * log(1 + d/1000) / log(11)` (10m で外周)
-- スイープ線は `lv_arc` で範囲を毎フレーム更新
-- フレームレート: 30 fps 目標、`LV_DISP_DEF_REFR_PERIOD = 33`
-- カラー深度: `LV_COLOR_DEPTH=16`、PSRAM 有効化必須
-
----
-
-### Phase 3: 実データ繋ぎ込み + ゲームロジック 【5/2 (土)】
-
-**目的**: UART パーサと UI を繋ぎ、「タグを集める」ゲームロジックを実装する。
+**目的**: NXP SDK でビルド・書込・動作確認のサイクルを確立。
 
 **タスク**
 
-1. UART タスクと UI タスクを FreeRTOS queue で疎結合に
-   - `xQueueSend(uwb_queue, &measurement, 0)` (最新値を捨てない、queue length=10)
-   - UI タスクは 33ms ごとに最新値を読んで描画
-2. 移動平均フィルタ実装:
-   - `main/uwb/uwb_filter.c`: window=5 の単純移動平均
-   - 距離が 0mm or 50000mm 以上は異常値として除外
-3. ゲーム状態機械:
-   ```
-   IDLE → SEARCHING → COLLECTING(found_count++) → SUMMONING → WISH → END → IDLE
-   ```
-   - `IDLE`: タイトル画面、タッチで開始
-   - `SEARCHING`: レーダー描画中
-   - `COLLECTING`: タグから 30cm 以内に 2 秒滞在で「取得」、効果音 + 星追加
-   - `SUMMONING`: 7個取得で発火、神龍召喚演出
-   - `WISH`: ウーロン音声 + パンティ演出
-   - `END`: スター散らばりアニメ → IDLE へ
-4. 取得済みタグはレーダーから消す (光点を非表示)
-5. 状態遷移ログをシリアルに出す (デバッグ用)
+1. NXP UWBIOT SDK の `demos/SR1XX/demo_ranging_controller` をビルド
+2. Murata 提供のパッチ (`2bp_prebuilt_*.patch`) を適用
+3. MCU-Link Pro 経由で 2BP に焼く
+4. PC で UART モニタしながら Initiator 動作確認 (ペアの 2DK は出荷時 FW のまま)
+5. 同様に 2DK に Responder ベースのサンプルを焼く試行 (Initiator サンプルを改造)
 
-**成果物**
+**成果物**: 自分でビルドした FW で 1:1 ranging が動く
 
-- `main/game/game_state.c`
-- `main/uwb/uwb_filter.c`
-- 1個ずつ近づくとちゃんと「集まった」判定が出る
-- 取得時に右上の星が増える
+### Phase 2: カスタム ASCII プロトコル実装 【5/12-19】
 
-**注意点**
-
-- AoA は屋内マルチパスでフラフラする → フィルタ必須
-- 「30cm 以内」判定は閾値を可変にしておく (デモ動画撮影時に調整)
-- タグID の自動マッピングが必要 (2DK 7個分、初回検出順に色割当 or 固定UUID)
-
----
-
-### Phase 4: 神龍演出 + ウーロン音声 【5/2 (土) 夜】
-
-**目的**: 7個揃った瞬間の演出を仕上げる。コンテストで一番映える部分。
+**目的**: ESP32 ↔ 2BP の自前 UART プロトコル定義・実装。
 
 **タスク**
 
-1. VOICEVOX (ホスト PC で事前生成) で WAV 出力:
-   - **shenron_appear.wav**: 「神よ…願いを言え…何でも一つだけ叶えてやろう…」(低音・荘厳・ずんだもん？四国めたん？要選定)
-   - **oolong.wav**: 「ギャルのパンティおくれーっ！」(高音・早口、これは絶対外せない)
-   - **shenron_grant.wav**: 「よかろう…」
-   - 全て 16kHz / 16bit / mono / WAV
-2. SD カードから WAV を読込み、I2S で再生:
-   - `esp_audio` または `esp-adf` フレームワーク採用
-   - Waveshare の I2S 出力先 (内蔵ブザー or 外付け MAX98357A) を確認
-3. 神龍召喚アニメ (`main/ui/summon_view.c`):
-   - 画面が緑→金にフェード (3秒)
-   - 雷エフェクト: ランダム位置に白線を `lv_canvas_draw_line()` で 0.2秒だけ描画 × 5回
-   - 龍シルエット PNG をフェードイン (画面中央、10秒滞在)
-4. パンティ演出:
-   - 画面下から PNG が左右に揺れながら降ってくる (`lv_anim` で y, x 同時)
-   - 3〜5枚を時差で出現、5秒で完了
-5. 終了演出:
-   - 集めた星7個が四方に飛び散る
-   - 黒画面フェード → タイトルへ
+1. `firmware/2bp-fw/` にプロジェクト雛形作成
+2. ASCII コマンド仕様策定 (`docs/2bp-protocol.md` 確定):
+   - `RANGE` → `OK TAG1:dist,az,el TAG2:dist,az,el ...`
+   - `SET_TAGS <count> <mac1> <mac2> ...`
+   - `STATUS` → `READY` / `BUSY` / `ERROR`
+3. UART タスクと Ranging タスクを FreeRTOS で分離
+4. round-robin スケジューラ (タグ N 個を順番に Unicast TWR)
+5. ESP32 側 `main/uwb/uwb_uart.c` で ASCII パース実装
+6. 1:1 で実距離・方位データが LVGL レーダーに乗る
 
-**成果物**
+**成果物**: ESP32 のレーダー画面に 1 タグの実距離が出る
 
-- `main/audio/audio_player.c`
-- `assets/audio/*.wav` (4ファイル)
-- `assets/images/*.png` (PNG → LVGL `.c` ヘッダ変換 or SD から都度読込)
+### Phase 3: 2DK Responder 化 + 2 タグ同時 【5/19-26】
 
-**実装メモ**
+**目的**: 2 タグを round-robin で同時に追跡。
 
-- 音声合成はリアルタイムでやらない、必ず事前生成
-- I2S DMA バッファサイズ 1024、queue 8 程度
-- PNG は LVGL Image Converter で C 配列化したほうが速い
-- パンティは透過 PNG、適度にぼかすと品の悪さが軽減（適度に残すのが良い）
+**タスク**
 
----
+1. `firmware/2dk-fw/` で 2DK 用 Responder FW 実装
+2. 2DK ×2 個を異なる UWB MAC で Responder として常駐
+3. 2BP の round-robin スケジューラを 2 タグ対応化
+4. ESP32 のレーダー画面に 2 タグの実位置が出る
+5. ゲームロジック (30cm 以内 N秒で取得判定) の実装・チューニング
 
-### Phase 5: デモ動画撮影 【5/4 (月)】
+**成果物**: 2 タグを近づけたら順次「取得」アニメ → 星が増える
 
-**目的**: ProtoPedia 用 2分以内のデモ動画を撮る。GW最終日、子守も復帰する直前。
+### Phase 4: 神龍演出 + ウーロン音声 + 7タグ演出 【5/26-6/10】
 
-**シナリオ案** (詳細は `docs/demo-scenario.md`)
+**目的**: 7 タグ揃った演出を仕上げる (実機 2 タグ + 5 タグぶん演出)。
+
+**タスク**
+
+1. VOICEVOX で WAV 出力:
+   - shenron_appear.wav: 「神よ…願いを言え…」
+   - oolong.wav: 「ギャルのパンティおくれーっ！」
+   - shenron_grant.wav: 「よかろう…」
+2. SD カードから WAV を I2S で再生
+3. 神龍召喚アニメ (緑→金フェード + 雷 + 龍シルエット)
+4. パンティ演出 (PNG が左右に揺れて降ってくる)
+5. **「2 個実機取得 → 5 個ぶんは演出のみで足す」分岐ロジック** (動画用)
+6. 起動から終了までの状態遷移を一通り通す
+
+**成果物**: 「2 タグ取って → 神龍召喚 → ウーロン → 終了」が一気通貫で動く
+
+### Phase 5: デモ動画撮影 + ProtoPedia 応募 【6/10-22】
+
+**シナリオ**: 詳細は `docs/demo-scenario.md`
 
 | 時間 | 内容 |
 |------|------|
 | 0:00-0:10 | タイトル: 「Dragon Radar UWB - DigiKey Make ONE Challenge 2026」 |
 | 0:10-0:25 | ハード紹介: Murata 2BP/2DK、Waveshare 丸型 LCD のアップ |
-| 0:25-0:40 | 「自分イチ」テーマ説明: 初 UWB? 初 LVGL? 字幕で軽く |
-| 0:40-1:30 | 公園で子供がタグ7個を探すデモ。手元アップ + 子供の表情 + 引き |
-| 1:30-1:45 | 7個目を見つけた瞬間、神龍召喚 |
+| 0:25-0:40 | 「自分イチ」テーマ説明 |
+| 0:40-1:20 | **公園で子供がタグ 2 個を探すデモ** (本物の UWB 動作) |
+| 1:20-1:30 | カット繋ぎで「7 個目発見」演出 (内部で擬似的に 7 個揃える) |
+| 1:30-1:45 | 神龍召喚 |
 | 1:45-1:55 | ウーロン降臨「パンティおくれーっ」 |
 | 1:55-2:00 | クレジット |
 
-**撮影 Tips**
+**応募内容**:
+- ProtoPedia 一般公開で登録
+- デモ動画 URL (YouTube 限定公開可)
+- myLists 部品表 URL
+- 「自分イチ」テーマ:
+  - 候補: 「自分イチ初の UWB 統合」「自分イチ初の MCUXpresso ファーム開発」「自分イチ初の二段 MCU 構成 (ESP32 ↔ QN9090) 通信設計」
+- 使用パーツ全 SKU、開発過程の写真、GitHub リンク (MIT or Apache-2.0)
 
-- 朝〜午前中の自然光で撮る (画面が見やすい)
-- 三脚 + スマホで定点 + GoPro/手撮りで動きの2系統
-- 子供の声は別マイクで拾えると最高
-- パンティ演出は必ず子供のリアクションを撮る (これが一番映える)
-- 編集は ffmpeg or DaVinci Resolve、字幕は CapCut でも可
+### Phase 6: Path B 移植チャレンジ 【7-8月、応募後】
 
----
+**目的**: ESP32 で SR150 を SPI 直叩きできるようにする (Maker Faire 用「進化版」)。
 
-## ProtoPedia 応募チェックリスト
+**タスク**
 
-応募ページに登録する項目:
+1. NXP UWBIOT SDK の HAL 層 (SPI transport, GPIO, timer) を ESP-IDF に移植
+2. UCI core を ESP32 上で動作確認
+3. 校正値を `UWB_DeviceConfig_SR1XX.h` から移植
+4. 既存の Path C 実装と切替可能に (config flag で選択)
 
-- [ ] 作品タイトル: 「Dragon Radar UWB ～ドラゴンボールを探せ～」(仮)
-- [ ] 一般公開設定で登録
-- [ ] デモ動画 URL (YouTube 限定公開 OK、2分以内)
-- [ ] myLists 部品表 URL
-  - DigiKey で買った 2BP + 2DK + Waveshare の購入履歴をリスト化
-  - DigiKey の「おすすめ製品」を含む（加点対象）
-- [ ] 「自分イチ」テーマの説明
-  - 候補: 「初めての UWB」「初めての LVGL」「初めての音声合成統合」「自分史上1番難しい配線」など
-- [ ] 使用パーツの全 SKU 記載
-- [ ] 開発過程の写真 (配線、デバッグ画面、子供がデモしている写真)
-- [ ] ソースコード公開: GitHub リンク (MIT or Apache-2.0)
+### Phase 7: 7 タグ拡張 + Maker Faire 出展 【7-9月】
+
+**タスク**
+
+1. 6/22 応募後すぐ 2DK ×5 を DigiKey に発注
+2. 5 個ぶんの 2DK に Responder FW 焼込
+3. round-robin スケジューラを 7 タグ対応化、サイクル時間チューニング
+4. (オプション) 自作タグ PCB 設計・試作
+5. Maker Faire Tokyo 2026 (2026-09-05/06) で 7 タグ完全版を実演
 
 ---
 
 ## 依存関係
 
-**ESP32-S3 側 (ESP-IDF)**
+### ESP32-S3 側 (ESP-IDF)
 
-- ESP-IDF v5.3+
-- LVGL v9.x (`lvgl/lvgl` ESP-IDF コンポーネント版)
-- ST77916 LCD driver (Waveshare 公式 or `esp_lcd` ベースで自作)
-- GT911 タッチ driver (`esp_lcd_touch_gt911`)
+- ESP-IDF v5.3.2 ✅ インストール済 (`~/esp/esp-idf`)
+- LVGL v9.2 ✅ managed component で取得済
+- ST77916 LCD driver (Waveshare 公式 GitHub から取込予定)
+- esp_lcd_touch_cst816s ✅ managed component で取得済
 - esp_audio or esp-adf (WAV 再生)
 - FATFS (SD カードアクセス)
 
-**ホスト側ツール**
+### QN9090 側 (Path C で新設)
 
-- VOICEVOX (https://voicevox.hiroshiba.jp/) - 音声生成
-- ffmpeg - 動画編集 + WAV フォーマット変換
-- LVGL Image Converter (https://lvgl.io/tools/imageconverter) - PNG→C配列
-- DaVinci Resolve or CapCut - 動画編集
+- MCUXpresso IDE
+- NXP UWBIOT SDK SR150 v04.06.00 + Murata パッチ
+- LinkServer (MCU-Link Pro と通信)
+
+### ホスト側ツール
+
+- VOICEVOX - 音声生成
+- ffmpeg - 動画編集 + WAV 変換
+- LVGL Image Converter - PNG→C 配列
+- DaVinci Resolve / CapCut - 動画編集
 
 ---
 
@@ -312,40 +345,55 @@ dragon-radar/
 
 | 症状 | 対処 |
 |------|------|
-| 2BP がうんともすんとも | リセットボタン長押し、USB 給電確認、別 USB ポートで試す |
+| QN9090 認識されない | MCU-Link Pro のファーム最新化、SWD ピン位置確認、Target Power 設定 |
+| カスタム FW 焼いた後動かない | `firmware-backups/` から元の Murata FW を復元 |
 | LCD が真っ黒 | backlight GPIO HIGH 確認、SPI clock を 10MHz まで下げる、PSRAM 有効化確認 |
 | LVGL がカクつく | `LV_COLOR_DEPTH=16`、PSRAM 有効化、frame buffer を internal RAM に |
 | UART 文字化け | ボーレート再確認、GND 共通確認、配線長を 10cm 以内に |
 | AoA がフラフラ | 移動平均 window を 10 まで増やす、屋外で撮影 |
 | WAV が再生されない | I2S ピン番号確認、サンプルレート 16kHz / 16bit / mono か確認 |
-| 7個タグ識別できない | 2DK 個体ごとの UUID を事前にメモして config に書く |
+| ranging のレートが低い | round-robin の各 TWR を高速化 (UCI session を維持したまま target 切替) |
 
 ---
 
-## 5/5 以降 (応募までの仕上げ + ストレッチゴール)
+## 重要な制約と判断記録
 
-- 残り 5 個の 2DK EVK 追加発注 (DigiKey)
-- 3D プリント筐体 (DMM.make でナイロンか透明アクリル)
-- 7個目発見時に LED ストリップで派手な演出 (WS2812B を Grove で外付け)
-- バッテリ駆動化 (LiPo + 充電回路)
-- README.md を英語化 (DigiKey 本社にも刺さる可能性)
-- 子供にレビューさせて UI 調整
+### Murata FW のロール制約 (重要)
+
+- **2DK の出荷時 FW は Initiator/Controller 固定**。タグ (Responder) として使うにはカスタム FW 必須。
+- 2BP は出荷時 FW で Initiator/Responder 両対応だが、PnP モードは Unicast 1:1 のみ。
+
+### サンプルスクリプトはすべて Unicast
+
+Murata 提供の Python スクリプトは `*_Unicast_*.py` のみ。1:N (Multicast) TWR は SDK 側でサポートされているが、サンプルは未提供。Phase 2-3 で round-robin Unicast を自前実装する。
+
+### 2BP 1 個運用のリスクと対策
+
+- 2BP は ~$150 と高価、保有 1 個のみ
+- Path C 採用により破壊的操作 (QN9090 erase など) は不要
+- それでも Phase 0 で必ず QN9090 フラッシュをバックアップ
+- カスタム FW 開発中は MCU-Link Pro 経由で何度でも書き戻し可能
+
+### EA-WO1391-1228 の扱い
+
+- 正体未確定 (Embedded Artists 系の M.2 系モジュール推定)
+- Phase 0 で確認、用途が判明したら本仕様書に追記
 
 ---
 
 ## Claude Code への指示
 
-このドキュメントを `dragon-radar/README.md` として置き、Claude Code に以下の手順で進めさせる:
-
-1. Phase 1 から順番に着手。各 Phase 完了後に成果物を確認してから次へ進む。
-2. Phase 1 で詰まったら、まず raw bytes ダンプを取得してそれを共有する (パース実装は後回しでOK)。
-3. 各タスクは git commit を細かく切る (Phase ごとに最低3コミット)。
-4. 完了したタスクはチェックボックスにチェックを入れる。
-5. 詰まったら作業をブロックして人間に質問する (推測で進めない)。
-6. ESP-IDF のビルドエラーは抱え込まずに即報告。
-7. ハードウェアに依存する確認 (LCD 表示、UART 受信、音声出力) は人間が実機で確認、結果をフィードバック。
+1. Phase 0 から順番に着手。各 Phase 完了後に成果物を確認してから次へ進む。
+2. 各タスクは git commit を細かく切る (Phase ごとに最低 3 コミット)。
+3. 完了したタスクはチェックボックスにチェックを入れる。
+4. 詰まったら作業をブロックして人間に質問する (推測で進めない)。
+5. ESP-IDF / MCUXpresso のビルドエラーは抱え込まずに即報告。
+6. ハードウェアに依存する確認 (LCD 表示、UART 受信、QN9090 書込、UWB 動作) は人間が実機で確認、結果をフィードバック。
+7. NXP UWBIOT SDK の中身は NDA 配下、コミット禁止 (`firmware/2bp-config/` は gitignore 済)。
+8. **Path B 移植は 6/22 応募完了後に着手** (それまでは Path C に集中)。
 
 開発開始日: 2026-04-29
-GW 集中期間終了: 2026-05-04
-コンテスト応募締切: 2026-06-22
-Maker Faire Tokyo 2026 (招待されれば): 2026-09-05〜06
+GW 残り集中期間: 5/3 (日) - 5/4 (月)
+コンテスト応募締切: **2026-06-22**
+Path B 移植開始: 2026-07 (応募後)
+Maker Faire Tokyo 2026: 2026-09-05/06
