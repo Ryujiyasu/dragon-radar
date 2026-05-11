@@ -1,0 +1,4 @@
+# 2bp-config/ 全配下は NDA 配下 (Murata PDF, NXP SDK, ファームバックアップ)
+# git に push しない。.gitignore 自身のみ追跡対象。
+*
+!.gitignore

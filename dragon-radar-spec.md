@@ -2,8 +2,8 @@
 
 DigiKey Make ONE Challenge 2026 応募作品。Murata UWB EVK + Waveshare ESP32-S3-Touch-LCD-1.85 でドラゴンレーダー風の宝探しデバイスを作る。子供と公園で 2-7 個のタグを探し、全部集めると神龍が召喚されてウーロンが「ギャルのパンティおくれーっ」と叫ぶ。
 
-応募締切: **2026-06-22 23:59** (残り ~50日 / 起算 2026-05-03)
-GW 残り集中期間: 5/3 (日) - 5/4 (月)
+応募締切: **2026-06-22 23:59** (残り **42 日** / 起算 2026-05-11)
+GW (4/29-5/6) 終了、平日モード移行。子守再開済で開発時間は **夜 + 週末**。
 本ドキュメントは Claude Code への開発指示書として使用する。
 
 ---
@@ -34,16 +34,36 @@ GW 残り集中期間: 5/3 (日) - 5/4 (月)
 
 | 役割 | 型番 | 数 | 状態 / 備考 |
 |------|------|---|------|
-| プレイヤー機 UI | Waveshare ESP32-S3-Touch-LCD-1.85 | 1 | ESP32-S3 + 1.85" 丸型 LCD (360×360, ST77916), 静電容量タッチ, USB-C, microSD, I2S audio |
+| プレイヤー機 UI (旧) | Waveshare ESP32-S3-Touch-LCD-1.85 | 1 | ESP32-S3 + 1.85" 丸型 LCD (360×360, ST77916)。画面が小さく、Bandai 玩具感は出るが「ガチ路線」のため格上げ予定 |
+| **プレイヤー機 UI (新) ⭐** | **Waveshare ESP32-P4-WIFI6-Touch-LCD-3.4C** | **1 (発注予定)** | **ESP32-P4 + ESP32-C6 (Wi-Fi6/BT5、未使用)、3.4" 丸型 LCD (800×800, MIPI-DSI 2-lane)、10 点タッチ、デュアルマイク、microSD。$80-90、DigiKey 発注予定** |
 | プレイヤー機 UWB | Murata Type 2BP EVK (LBUA0VG2BP-EVK-P) | 1 | NXP **SR150** (距離+AoA可) + QN9090 MCU。Path C では QN9090 にカスタム FW を焼く |
 | タグ #1, #2 | Murata Type 2DK EVK (LBUA2ZZ2DK-EVK) | 2 | NXP **SR040** (距離のみ) + QN9090 MCU。CR2032 駆動可、隠して放置できる。Path C で Responder 化 |
 | デバッガ/SWD 書込 | NXP MCU-Link Pro | 1 | QN9090 へのカスタム FW 書込用、Bridge UART/Target Power 機能あり |
 | 用途未確定 | EA-WO1391-1228 (Embedded Artists 系?) | 1 | Phase 0 で正体特定すること |
 
+### UI 操作系の仕様 (確定)
+
+**物理ボタン × 1 + タッチスクリーン + 音声トリガ の三段構え**:
+
+| 操作系 | 用途 | 実装時期 |
+|---|---|---|
+| **物理ボタン (MKBKLLJY ø12mm メタル + 緑 LED、配線済)** | スキャン開始 / 一時停止 (アニメリスペクト) + 神龍 LED 演出 | Phase 4-5 |
+| **タッチスクリーン (10 点)** | ズーム、タグ情報表示、設定メニュー | Phase 2-3 |
+| **音声トリガ (デュアルマイク)** | 「ドラゴンボールを探せ!」で起動 | Phase 7 (Maker Faire 用) |
+
+筐体上部に **MKBKLLJY 緑 LED モメンタリ ボタン (ø12mm)** を配置 (Bandai 玩具と同位置)。
+押下時に「ピッ」効果音 (VOICEVOX 生成)、待機中は LED 呼吸光、神龍召喚時は LED 高速点滅。
+LED は 12V 仕様なので、ESP32 GPIO から MOSFET で 5V (USB-C 5V) を ON/OFF する構成。
+
 ### 機材についての追記
 - 2BP EVK のヘッダピン (10ピン×2列) が一部曲がっているが、**Path C では USB ケーブルのみで動作するため影響なし**
 - 2BP EVK は **1 個しか保有しない方針** (高価なため、破損時のみ追加発注)
 - 2DK EVK の追加 5 個は **6/22 応募後 (7月頃) に発注予定** (Maker Faire 7 タグ拡張用)
+- **プレイヤー機 LCD は 1.85" → 3.4" に格上げ決定** (動画映え重視、ESP32-S3 → ESP32-P4 への移行が必要):
+  - 旧 1.85" (ESP32-S3-Touch-LCD-1.85) は予備 / Phase 2 検証用に保管
+  - 新 3.4" (ESP32-P4-WIFI6-Touch-LCD-3.4C) は 5/4 発注、5/12 頃着想定
+  - 筐体: ø ~110mm × 厚 30mm (両手持ち or 大人片手、Bandai より大きいが解像度 800×800 で迫力)
+  - 移行作業: ESP-IDF target esp32s3→esp32p4、display_init.c (SPI ST77916 → MIPI-DSI)、LVGL 寸法定数 (360 → 800)、半日〜1日工数
 
 ### 9月 Maker Faire 用追加発注 (7月予定)
 
@@ -176,16 +196,20 @@ dragon-radar/
 
 ## 開発スケジュール (Path C / 二段構え)
 
-### 現状 (2026-05-03 時点) ✅ 5/3 達成済み
+### 現状 (2026-05-11 時点) ✅ 達成済み
 
-- ESP-IDF v5.3.2 インストール
+- ESP-IDF v5.3.2 インストール (esp32p4 ターゲット対応確認済)
+- ARM GCC 13.2 + J-Link Commander インストール
 - `dragon-radar/` プロジェクト初期化
-- ESP-IDF プロジェクトスケルトン (LVGL 9.2 取込、ビルド成功)
+- ESP-IDF プロジェクトスケルトン (LVGL 9.2 取込、ビルド成功) - 旧 1.85" 用
 - **Phase 2 (LVGL レーダー UI)** 実装済: ダミーデータで光点が動く
 - Murata PDF 25 件取得 (NDA 配下、gitignore)
-- 2BP/2DK Quick Start Guide 解析、Path C 採用決定
+- 2BP/2DK Quick Start Guide 解析、**Path C 採用決定**
+- **NXP UWBIOT SR150 v04.08.01 MCUx SDK 取得・展開済** (NDA 配下)
+- **Waveshare ESP32-P4-WIFI6-Touch-LCD-3.4C 5/11 着** (本体 + 大型スピーカー)
+- ESP32-S3 → ESP32-P4 移行方針確定
 
-### Phase 0: 環境準備 + 校正値バックアップ 【5/4 (月)】
+### Phase 0: 環境準備 + 校正値バックアップ 【5/11-12】 (大半済)
 
 **目的**: Path C の安全マージン確保。失敗時に元の Murata プリビルド FW に戻せる準備。
 

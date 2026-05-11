@@ -16,7 +16,8 @@ Stage 3 (9/5-6)  : Maker Faire Tokyo 2026 で 7 タグ完全版を出展
 
 | 役割 | 型番 | 数 |
 |---|---|---|
-| プレイヤー機 UI | Waveshare ESP32-S3-Touch-LCD-1.85 | 1 |
+| プレイヤー機 UI (新) | **Waveshare ESP32-P4-WIFI6-Touch-LCD-3.4C** ⭐ 発注予定 | 1 |
+| プレイヤー機 UI (旧/予備) | Waveshare ESP32-S3-Touch-LCD-1.85 | 1 |
 | プレイヤー機 UWB | Murata 2BP EVK (LBUA0VG2BP-EVK-P) | 1 |
 | タグ #1, #2 | Murata 2DK EVK (LBUA2ZZ2DK-EVK) | 2 |
 | デバッガ | NXP MCU-Link Pro | 1 |
