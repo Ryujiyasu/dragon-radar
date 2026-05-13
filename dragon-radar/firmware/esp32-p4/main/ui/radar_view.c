@@ -45,34 +45,33 @@ static void polar_to_cartesian(uint16_t distance_mm, int16_t azimuth_deg, int32_
 
 static void draw_grid(lv_obj_t *parent)
 {
-    /* Fine grid (Bandai CRT-style mesh).
-     * Lines run across full canvas, hidden outside the circular display area by panel mask. */
-    #define GRID_STEP 40
+    /* Bandai-style grid: pronounced black lines on green background. */
+    #define GRID_STEP 50
     /* vertical lines */
     for (int x = GRID_STEP; x < DR_SCREEN_SIZE; x += GRID_STEP) {
-        static lv_point_precise_t pts[16][2];
+        static lv_point_precise_t pts[20][2];
         int i = x / GRID_STEP - 1;
-        if (i >= 16) break;
+        if (i >= 20) break;
         pts[i][0].x = x; pts[i][0].y = 0;
         pts[i][1].x = x; pts[i][1].y = DR_SCREEN_SIZE;
         lv_obj_t *line = lv_line_create(parent);
         lv_line_set_points(line, pts[i], 2);
-        lv_obj_set_style_line_color(line, DR_COLOR_RADAR_DIM, 0);
-        lv_obj_set_style_line_width(line, 1, 0);
-        lv_obj_set_style_line_opa(line, LV_OPA_40, 0);
+        lv_obj_set_style_line_color(line, DR_COLOR_GRID, 0);
+        lv_obj_set_style_line_width(line, 2, 0);
+        lv_obj_set_style_line_opa(line, LV_OPA_80, 0);
     }
     /* horizontal lines */
     for (int y = GRID_STEP; y < DR_SCREEN_SIZE; y += GRID_STEP) {
-        static lv_point_precise_t pts[16][2];
+        static lv_point_precise_t pts[20][2];
         int i = y / GRID_STEP - 1;
-        if (i >= 16) break;
+        if (i >= 20) break;
         pts[i][0].x = 0;              pts[i][0].y = y;
         pts[i][1].x = DR_SCREEN_SIZE; pts[i][1].y = y;
         lv_obj_t *line = lv_line_create(parent);
         lv_line_set_points(line, pts[i], 2);
-        lv_obj_set_style_line_color(line, DR_COLOR_RADAR_DIM, 0);
-        lv_obj_set_style_line_width(line, 1, 0);
-        lv_obj_set_style_line_opa(line, LV_OPA_40, 0);
+        lv_obj_set_style_line_color(line, DR_COLOR_GRID, 0);
+        lv_obj_set_style_line_width(line, 2, 0);
+        lv_obj_set_style_line_opa(line, LV_OPA_80, 0);
     }
     #undef GRID_STEP
 }
@@ -120,21 +119,30 @@ static void draw_crosshair(lv_obj_t *parent)
 
 static void draw_center_pointer(lv_obj_t *parent)
 {
-    /* Triangle pointing up at the center = "you are here" indicator (Bandai radar style) */
-    #define PT_SIZE 24
-    static lv_point_precise_t triangle[] = {
-        {DR_CENTER,           DR_CENTER - PT_SIZE},      /* top */
-        {DR_CENTER - PT_SIZE, DR_CENTER + PT_SIZE / 2},  /* bottom-left */
-        {DR_CENTER + PT_SIZE, DR_CENTER + PT_SIZE / 2},  /* bottom-right */
-        {DR_CENTER,           DR_CENTER - PT_SIZE},      /* close */
-    };
-    lv_obj_t *tri = lv_line_create(parent);
-    lv_line_set_points(tri, triangle, 4);
-    lv_obj_set_style_line_color(tri, DR_COLOR_TEXT, 0);   /* gold */
-    lv_obj_set_style_line_width(tri, 3, 0);
-    lv_obj_set_style_line_opa(tri, LV_OPA_COVER, 0);
-    lv_obj_set_style_line_rounded(tri, true, 0);
+    /* Filled coral triangle pointing up = "you are here" indicator (Bandai style).
+     * Scanline fill: stack of horizontal bars from apex (top) to base (bottom). */
+    #define PT_SIZE   16     /* half-width of base, also vertical reach above center */
+    #define PT_STEP   2      /* scanline thickness in px */
+    const int y_top    = DR_CENTER - PT_SIZE;
+    const int y_bottom = DR_CENTER + PT_SIZE / 2;
+    const int height   = y_bottom - y_top;  /* 1.5 * PT_SIZE */
+
+    for (int y = y_top; y <= y_bottom; y += PT_STEP) {
+        int dy = y - y_top;                          /* 0 at apex, height at base */
+        int half_w = (dy * PT_SIZE) / height;        /* grows linearly */
+        if (half_w < 1) half_w = 1;
+
+        lv_obj_t *seg = lv_obj_create(parent);
+        lv_obj_remove_style_all(seg);
+        lv_obj_set_size(seg, half_w * 2, PT_STEP);
+        lv_obj_set_pos(seg, DR_CENTER - half_w, y);
+        lv_obj_set_style_bg_color(seg, DR_COLOR_POINTER, 0);
+        lv_obj_set_style_bg_opa(seg, LV_OPA_COVER, 0);
+        lv_obj_set_style_radius(seg, 0, 0);
+        lv_obj_clear_flag(seg, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
+    }
     #undef PT_SIZE
+    #undef PT_STEP
 }
 
 static void create_sweep(lv_obj_t *parent)
@@ -215,8 +223,7 @@ void radar_view_create(lv_obj_t *parent)
     lv_obj_clear_flag(s_radar_root, LV_OBJ_FLAG_SCROLLABLE);
 
     draw_grid(s_radar_root);
-    draw_concentric_rings(s_radar_root);
-    draw_crosshair(s_radar_root);
+    /* Bandai style: skip concentric rings + crosshair (grid alone shows distance). */
     create_sweep(s_radar_root);
     create_dots(s_radar_root);
     draw_center_pointer(s_radar_root);
