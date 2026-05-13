@@ -1,0 +1,5 @@
+## Dragon Radar (ESP32-P4 / Waveshare 3.4C) component manifest
+dependencies:
+  idf: ">=5.5"
+  lvgl/lvgl: "^9.*"
+  waveshare/esp32_p4_wifi6_touch_lcd_xc: "*"
