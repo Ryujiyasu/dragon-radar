@@ -227,9 +227,15 @@ dragon-radar/
 
 **観測値 (5/19 実機計測)**
 
-- 2BP UWB セッション ID (auto-start): `0x00000001` (sequence num 観測値ベース)
-- 2DK UWB セッション ID (auto-start): `0x11223344`
-- → **Session ID 不一致で ranging 完成せず** (v04.08.01 vs v04.03.14 のデフォルト値違い)
+- 2BP RANGE_DATA_NTF 内の Session 識別子: `0x00000001` (Session Handle と推測)
+- 2DK RANGE_DATA_NTF 内の Session 識別子: `0x11223344` (Session ID そのまま)
+- → 一見「Session ID 不一致」に見えるが、SDK source 確認結果 **両方とも内部設定は `0x11223344`** で一致
+  (`demos/SR1XX/demo_ranging_controller/demo_ranging_controller.c:31` および
+   `demos/SR040/demo_tracker_sr040/app_Ranging_Cfg.h:17` で定義)
+- → 実際の原因は **UCI プロトコル仕様の世代差** (v04.08.01 は UCI 2.0+ で Session Handle 採用、
+  v04.03.14 は旧 UCI で Session ID 直接表記) と推定
+- → **2BP/2DK の UCI バージョンを揃える** ことが ranging 完成の鍵
+- Murata 2bp_prebuild パッチは session ID を変更しない (TX_POWER + XTAL_CAP 校正と ranging timeout 5→30 分のみ)
 - 2DK は SR040 へ毎起動で SWUP (Software Update) push が必要 (host script が ~30 秒で 275 component を転送)
 - FTDI 工場シリアル: 全 EVK 同じ `DM86TTWC` (個体識別性なし、bus address で区別)
 - dk6prog PYFTDI backend は **要 sudo** (USB raw access のため)
