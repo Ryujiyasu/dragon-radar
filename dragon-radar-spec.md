@@ -209,6 +209,66 @@ dragon-radar/
 - **Waveshare ESP32-P4-WIFI6-Touch-LCD-3.4C 5/11 着** (本体 + 大型スピーカー)
 - ESP32-S3 → ESP32-P4 移行方針確定
 
+## 5/19 Phase 1 完了報告 + Phase 2 引継ぎ
+
+**完了済 (5/19)**
+
+| 項目 | 状態 | 場所 |
+|---|---|---|
+| ESP-IDF v5.5.4 + esp32p4 ターゲット | ✅ | `~/esp/esp-idf-v5.5` |
+| ARM GCC 13.2, J-Link Commander | ✅ | `~/tools/`, `/opt/SEGGER` |
+| MCUXpresso IDE for Linux | ✅ | `/usr/local/mcuxpressoide-25.6.136` |
+| SPSDK dk6prog (USB ISP 書込) | ✅ | `pip install spsdk` |
+| ESP32-P4-WIFI6-Touch-LCD-3.4C | ✅ 動作確認済 (Bandai 風 UI) | `firmware/esp32-p4/` |
+| 2BP/2DK ×2 出荷時 FW バックアップ | ✅ 3 ファイル | `firmware/2bp-config/firmware-backups/` (gitignore) |
+| 2BP に 2bp_controller_v04.08.01.bin 書込 | ✅ dk6prog 経由 | - |
+| 2DK ×2 に 2dk_controlee_v04.03.14.bin 書込 | ✅ dk6prog 経由 | - |
+| Murata PnP script 取得 (SR150 + SR040) | ✅ | `firmware/2bp-config/sdk/MTD-SCP-*` |
+
+**観測値 (5/19 実機計測)**
+
+- 2BP UWB セッション ID (auto-start): `0x00000001` (sequence num 観測値ベース)
+- 2DK UWB セッション ID (auto-start): `0x11223344`
+- → **Session ID 不一致で ranging 完成せず** (v04.08.01 vs v04.03.14 のデフォルト値違い)
+- 2DK は SR040 へ毎起動で SWUP (Software Update) push が必要 (host script が ~30 秒で 275 component を転送)
+- FTDI 工場シリアル: 全 EVK 同じ `DM86TTWC` (個体識別性なし、bus address で区別)
+- dk6prog PYFTDI backend は **要 sudo** (USB raw access のため)
+- dk6prog の引数: `-d DM86TTWC` で接続、`read/erase/write -o file 0x0 0x9DE00` で操作
+
+**機材コンディション (5/19 時点)**
+
+- 2BP の SR150 SPI ブレークアウトピン (TP20/TP81-87 周辺、2x4 ヘッダ): 一部曲がり/欠損
+  → Path C では使わないので**実害なし**
+- 2BP の QN9090 SWD ピン: **状態不明** (Quick Start 図と一致するコネクタを未特定)
+  → USB ISP モード (dk6prog) で代替できているので、現状問題なし
+- 2DK の SWD ピン: **生存**
+  → 必要なら J-Link でデバッグ可能、Phase 2 開発時の保険として有用
+- USB-A to Micro-B データ通信対応ケーブル: 必須 (充電専用品は不可)
+
+**Phase 2 への引継ぎ事項**
+
+1. **session ID 統一** が ranging 完成の鍵
+   - 自前ビルド時に `Demo_Common_Config.c` の `SESSION_ID` を 2BP/2DK 両者で揃える
+   - 推奨: `0x00112233` のような固定値、両側のソースを編集して再ビルド
+2. **NXP UWBIOT SDK で MCUXpresso 上でビルド** (PDF: `Type 2BP How to Build Pre-Built Binary.pdf` 参照)
+   - 2BP: SR150 SDK v04.08.01 のソース + Murata パッチ `2bp_prebuild_v04.08.01.patch`
+   - 2DK: SR040 SDK v04.03.14 のソース + Murata パッチ `2dk_prebuilt_v04.03.14.patch`
+3. **ESP32 ↔ QN9090 ASCII プロトコル** 実装 ([docs/2bp-protocol.md](dragon-radar/docs/2bp-protocol.md) 参照)
+4. 校正値は 2BP/2DK 個体ごとに記録 (`UWB_DeviceConfig_SR1XX.h`)、Murata パッチで適用される
+5. 万一書込ミスったら **firmware-backups/** から `dk6prog write 0x0 <backup>.bin` で原状復帰可能
+
+**Phase 1 検証で得た知見 (将来トラブルシュート用)**
+
+| 症状 | 原因/対処 |
+|---|---|
+| `Sem Timed out` / `UwbApi_Init Failed` | SR040 への SWUP 未完了、or SR150 と SR040 の SDK バージョン不整合 |
+| `UCI Header is not valid` 連発 | QN9090 がまだ ISP モード (リセット必要) / FW バージョン不一致 |
+| `2 USB devices match URL` | dk6prog は同シリアル 2 台同時不可、片方を物理切断 |
+| `--enable-non-contiguous-regions discards section ... 21KB` | ESP32-P4 v1.x シリコンで `CONFIG_SPIRAM_XIP_FROM_PSRAM` 有効だと IRAM 溢れ → 無効化 |
+| 起動 garbage 出力で baud 合わない | ISP モードから抜けてない、リセットボタンで物理リセット必要 |
+
+---
+
 ### Phase 0: 環境準備 + 校正値バックアップ 【5/11-12】 (大半済)
 
 **目的**: Path C の安全マージン確保。失敗時に元の Murata プリビルド FW に戻せる準備。

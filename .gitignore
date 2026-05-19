@@ -1,1 +1,7 @@
 .claude/
+*.jpg
+*.png
+*.bin
+*.deb
+*.deb.bin
+*.zip
