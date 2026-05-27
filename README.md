@@ -5,7 +5,7 @@
 
 円形 LCD を載せた手持ち端末が、周囲に散らばった UWB タグ (= ドラゴンボール) の **距離 + 方向 (AoA)** を 5 cm 精度で表示する。UI は 1980 年代バンダイの玩具版ドラゴンレーダーをオマージュ。
 
-詳細仕様は [`../dragon-radar-spec.md`](../dragon-radar-spec.md)。背景・設計判断・進捗の物語は本 README とブログ記事 ([Related reading](#related-reading)) で記録する。
+詳細仕様は [`dragon-radar-spec.md`](dragon-radar-spec.md)。背景・設計判断・進捗の物語は本 README とブログ記事 ([Related reading](#related-reading)) で記録する。
 
 ---
 
@@ -139,7 +139,7 @@ idf.py build
 idf.py -p /dev/ttyACM0 flash monitor
 ```
 
-GPIO 割当 ([uwb_uart.h](firmware/esp32-p4/main/uwb/uwb_uart.h)):
+GPIO 割当 ([uwb_uart.h](dragon-radar/firmware/esp32-p4/main/uwb/uwb_uart.h)):
 
 | ESP32-P4 GPIO | 2BP EVK TP | 信号 |
 |---|---|---|
@@ -159,7 +159,7 @@ xvfb-run --auto-servernum --server-args="-screen 0 1024x768x24" \
   -nosplash \
   -application org.eclipse.cdt.managedbuilder.core.headlessbuild \
   -data /tmp/mcux-ws \
-  -import firmware/2bp-config/sdk/UWBIOT_SR150_v04.04.03_MCUx/uwbiot-top/project/RhodesV4_SE \
+  -import dragon-radar/firmware/2bp-config/sdk/UWBIOT_SR150_v04.04.03_MCUx/uwbiot-top/project/RhodesV4_SE \
   -cleanBuild "RhodesV4_SE/Debug"
 ```
 
@@ -174,7 +174,7 @@ xvfb-run --auto-servernum --server-args="-screen 0 1024x768x24" \
 dk6prog listdev                                                    # DM86TTWC を確認
 dk6prog -d DM86TTWC read 0 0x9DE00 -o factory_backup.bin           # 工場 FW バックアップ (1 度だけ)
 dk6prog -d DM86TTWC erase 0 0x9DE00
-dk6prog -d DM86TTWC write 0 firmware/2bp-config/firmware-builds/2bp_dragon_radar_v0.1.bin
+dk6prog -d DM86TTWC write 0 dragon-radar/firmware/2bp-config/firmware-builds/2bp_dragon_radar_v0.1.bin
 ```
 
 ### 2DK は Murata 出荷 FW のまま使う
@@ -210,7 +210,7 @@ ESP32-P4 ↔ 2BP は物理 UART 配線で代替する。詳細: [#5 技適記事
 
 ### NDA 配下のファイル
 
-`firmware/2bp-config/` 以下は **Murata NDA 配下** (公式 PDF、NXP UWBIOT SDK、工場 FW バックアップ等)。
+`dragon-radar/firmware/2bp-config/` 以下は **Murata NDA 配下** (公式 PDF、NXP UWBIOT SDK、工場 FW バックアップ等)。
 gitignore で完全除外、Git に絶対コミットしない。`.gitignore` で `*` + `!.gitignore` パターン。
 
 `my.murata.com` から取得した PDF/SDK は配布禁止。これらに依存する手順は本 README とブログでは技術概念のみ記述し、ソースコード抜粋やキャリブレーション値は載せない。
@@ -240,6 +240,6 @@ NTF の session ID フィールドが見た目同じでも、v1.x (ID) と v2.0 
 
 ## ライセンス
 
-本リポジトリ内のオリジナルコード (主に `firmware/esp32-p4/`) はライセンス未確定。
-`firmware/2bp-config/` 以下は NXP / Murata の NDA 配下で再配布不可。
+本リポジトリ内のオリジナルコード (主に `dragon-radar/firmware/esp32-p4/`) はライセンス未確定。
+`dragon-radar/firmware/2bp-config/` 以下は NXP / Murata の NDA 配下で再配布不可。
 最終的に MIT または Apache-2.0 で公開予定 (応募完了後)。
