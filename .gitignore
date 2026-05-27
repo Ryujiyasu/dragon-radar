@@ -5,3 +5,15 @@
 *.deb
 *.deb.bin
 *.zip
+
+# Murata NDA / NXP UWBIOT SDK 関連 PDF (top-level に置いてもブロック)
+*.pdf
+
+# Google Search Console / Bing / その他サイト所有権確認ファイル
+google*.html
+BingSiteAuth.xml
+
+# キャプチャしたシリアル生ログ (NDA に触れる可能性あり、状況依存)
+*_uart_*.bin
+*_radar_*.bin
+*.log

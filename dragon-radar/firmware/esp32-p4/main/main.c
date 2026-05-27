@@ -7,8 +7,29 @@
 #include "bsp/display.h"
 
 #include "ui/radar_view.h"
+#include "uwb/uwb_uart.h"
+#include "uwb/uwb_filter.h"
 
 static const char *TAG = "dragon-radar";
+
+static void uwb_task(void *arg)
+{
+    (void)arg;
+    uwb_measurement_t m;
+    int seen = 0;
+    while (1) {
+        if (uwb_uart_recv(&m, 1000)) {
+            if (!uwb_filter_apply(&m)) continue;
+            bsp_display_lock(-1);
+            radar_view_set_tag(&m);
+            bsp_display_unlock();
+            if ((++seen % 10) == 0) {
+                ESP_LOGI(TAG, "tag=%u d=%u mm az=%d el=%d (n=%d)",
+                         m.tag_id, m.distance_mm, m.azimuth_deg, m.elevation_deg, seen);
+            }
+        }
+    }
+}
 
 void app_main(void)
 {
@@ -25,12 +46,8 @@ void app_main(void)
 
     bsp_display_lock(-1);
     radar_view_create(lv_screen_active());
-    radar_view_start_dummy_demo();
     bsp_display_unlock();
 
-    /* The LVGL adapter task is created by bsp_display_start_with_config().
-     * We just idle here. App-level UWB/game/audio tasks will be spawned later phases. */
-    while (1) {
-        vTaskDelay(pdMS_TO_TICKS(1000));
-    }
+    uwb_uart_init();
+    xTaskCreate(uwb_task, "uwb_rx", 4096, NULL, 5, NULL);
 }

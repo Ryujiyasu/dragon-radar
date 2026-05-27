@@ -275,6 +275,155 @@ dragon-radar/
 
 ---
 
+## 5/19 Phase 2 ブレイクスルー: 2BP↔2DK Ranging 成立 🐉
+
+**結論**: UCI バージョンを揃えれば **そのまま ranging 通る**。session ID の問題は副次的だった。
+
+**実施した組合せ**
+
+| 役割 | EVK | 書込 FW | UCI ver | 出所 |
+|---|---|---|---|---|
+| Initiator/Controller | 2BP (SR150 + QN9090) | `demo_ranging_controller-SR150-v04.04.03.bin` | **1.31** | NXP UWBIOT SDK v04.04.03 (Rhodes4_SE 用 bare bin) |
+| Responder/Controlee | 2DK (SR040 + QN9090) | `2dk_controlee_v04.03.14.bin` | **1.31** | Murata Standalone v04.03.14 (校正済) |
+
+これまでの v04.08.01 (UCI 2.0) ↔ v04.03.14 (UCI 1.31) では Session Handle/Session ID の表現が違って pair 不成立だったが、**両端を UCI 1.31 に揃えた瞬間に成立**した。
+
+**観測結果 (50–60 秒間の同時計測 / 手元配置 30–50 cm)**
+
+| EVK | サンプル数 | min | max | avg |
+|---|---:|---:|---:|---:|
+| 2BP (SR150 initiator) | 242 | 24 cm | 55 cm | **36.1 cm** |
+| 2DK (SR040 responder) | 296 | 22 cm | 54 cm | **35.6 cm** |
+
+両端で平均値の差 **0.5 cm**、レンジも合致。実距離 (手元 30–50 cm) と整合し、SR040 側で校正済 (Murata パッチ) の効果と思われる。
+
+**この組合せの欠点と次の手**
+
+- 2BP 側は **NXP 公式 Rhodes4_SE バイナリ** を流用しているため、Murata の TX_POWER / XTAL_CAP / 周辺校正が未適用 → 絶対距離精度は妥協ライン。
+- AoA はまだ未確認 (TWR distance のみ)。`RANGE_DATA_NTF` の AoA フィールドはパース必要。
+- Phase 2 で **Murata SDK v04.04.03 ベースの自前ビルド + 校正値適用** を行えば理想形。
+- session ID は両ファームともデフォルトで `0x11223344` 採用なので、自前ビルドでも変更不要。
+
+**意味**
+
+- Phase C のロジックレベルでは「2BP=Initiator、2DK=Responder、両者 UCI 1.31、session=`0x11223344`」が黄金パターン。
+- Phase 2 以降 (カスタム QN9090 FW + ESP32 ASCII プロトコル) のターゲット FW バージョンは **NXP SDK v04.04.03 / UCI 1.31** に確定。
+
+---
+
+## Phase 2 着手方針 (5/19 確定)
+
+### ベース SDK: v04.04.03 / Murata 校正なし
+
+| 項目 | 値 |
+|---|---|
+| ベース SDK | NXP UWBIOT SDK v04.04.03 (`UWBIOT_SR150_v04.04.03_MCUx/uwbiot-top/`) |
+| MCUXpresso project | `project/RhodesV4_SE/` (`.project` + `.cproject` あり) |
+| Demo | `demos/SR1XX/demo_ranging_controller/demo_ranging_controller.c` |
+| Murata 校正 | **適用しない** (v04.04.03 用パッチが Murata から未配布、v04.06.05 用パッチは UCI opcode `2E11→2F21` 差で直接適用不可)。絶対距離精度は妥協、レーダー演出に必要な相対変化は十分得られる。 |
+| ビルド方式 | MCUXpresso IDE GUI もしくは `mcuxpressoide -application org.eclipse.cdt.managedbuilder.core.headlessbuild` (CDT headless) |
+| 書込 | dk6prog (USB ISP) — Phase 1 と同じ |
+
+### Phase 2 サブタスク
+
+- **2a**. SDK 同梱の `demo_ranging_controller` を **無改変でビルド**。`binaries/Rhodes4_SE/demo_ranging_controller-SR150-v04.04.03.bin` (既に動作確認済の bare bin) と sha 一致を確認 → ビルド環境健全性のチェック。
+- **2b**. `libs/uwb-iot/uwb_api/PrintUtility/PrintUtility.c` の `printRangingData()` 内で `NXPLOG_APP_D("TWR[...].aoa_*")` 系を **カスタム ASCII フォーマットに置換**。
+  - 提案フォーマット: `RADAR,t=<tag_id>,d=<dist_cm>,az=<az_q9.7>,el=<el_q9.7>,st=<status>\n`
+  - APP 層 (NXPLOG_APP_I) で出すことで、既存の `TWR[0].distance` printf と同じ UART/baud で取得可能
+- **2c**. 改修バイナリを 2BP に dk6prog で焼く。2DK は v04.03.14 のまま。Murata Python script ではなく ESP32 (もしくは PC ホストテスト) で UART を直 read。
+- **2d**. ESP32-P4 側で UART (現状 GPIO 未確定) を初期化し、`RADAR,...` を parse → LVGL `radar_view.c` の光点座標に変換 (極座標 → 直交変換)。
+
+### ASCII プロトコル設計案
+
+ESP32 ← QN9090 (notifier):
+
+```
+RADAR,t=0,d=42,az=-15.3,el=2.1,st=0\n     # tag 0 ranging OK
+TICK,uptime=12345\n                        # 1Hz heartbeat
+LOG,msg=session_started\n                  # 任意ログ
+```
+
+ESP32 → QN9090 (control, Phase 2c+ で実装):
+
+```
+START\n                                     # ranging 開始
+STOP\n                                      # ranging 停止
+SET_TAG,id=1,mac=2223\n                    # 7 タグ対応の追加 (Phase B)
+```
+
+詳細プロトコル仕様は [docs/2bp-protocol.md](dragon-radar/docs/2bp-protocol.md) に切り出し済み。
+
+### リスクと回避策
+
+| リスク | 回避策 |
+|---|---|
+| MCUXpresso headless build がうまく動かない | GUI で代替、もしくは `mcuxpressoide-ide -nosplash` の `-application` 指定で試す |
+| Build 成果物 bin と Rhodes4_SE 同梱 bin の sha が一致しない | 元の binaries/ にある bin はメーカー署名済の可能性 → 違って当然と見て、動作で確認 |
+| AoA Azimuth が 0 で返ってくる | SR150 のアンテナ delay calib 未適用が原因の可能性 → 値が出ていれば校正ズレ程度なので進める |
+| `printRangingData` 改修で他デモがビルド不能になる | `#ifdef UWBIOT_APP_BUILD__DEMO_RANGING_CONTROLLER` で囲って影響範囲を限定 |
+
+### Phase 2 実機検証ログ (5/19 16:10)
+
+| 項目 | 値 |
+|---|---|
+| 2BP FW | `firmware-builds/2bp_dragon_radar_v0.1.bin` (353312 B、v04.04.03 SDK Debug ビルド) |
+| 2DK FW | `2dk_controlee_v04.03.14.bin` (出荷時 Murata 校正済) |
+| UART baud (debug console) | **3 000 000 bps** (`boards/Rhodes4_SPI/board.h:203`) |
+| ranging rate | ~5 Hz (20 秒で 100 行) |
+| 距離 (手元配置) | 19–24 cm |
+| AoA Azimuth | -44° 〜 -45° (左方向に 2DK、安定) |
+| AoA Elevation | -60.0° に固定 (SR150 は方位アンテナのみ、仰角は無効) |
+| サンプルログ | `firmware-builds/sample_radar_uart_20s.bin` (35613 B) |
+
+**出力フォーマット例** (3Mbps UART、ANSI色付き):
+
+```
+APP     :INFO :TWR[0].distance        : 21
+APP     :INFO :RADAR,t=0,d=21,az=-44.18,el=-60.0,st=0
+```
+
+ESP32 側パース仕様 (Phase 2d で実装):
+- baud: 3000000、ANSI escape (`\e[0;34m`〜`\e[0m`) は除去
+- `RADAR,t=<tag>,d=<cm>,az=<int>.<frac>,el=<int>.<frac>,st=<status>` を抽出
+- 角度: Q9.7 表記、`real_deg = int_part + (frac/128.0)` (符号は int_part に従う) で復元
+- status==0 のみ採用、他は drop
+- ranging timeout = 5 分なので再起動時はリセット必要
+
+### 技適制約 (5/19 確定)
+
+Waveshare ESP32-P4-WIFI6-Touch-LCD-3.4C 基板上の ESP32-C6 モジュールに **技適マーク未確認**。
+公開展示 (DigiKey Make ONE Challenge) では電波法違反になり得るため、
+
+**本プロジェクトでは ESP32-P4 ボードの WiFi/BT を一切使用しない方針**。
+
+影響:
+- 2BP ↔ ESP32-P4 通信は **物理配線 (UART 直結) で固定** (A2 ルート確定)
+- 将来の拡張案 (BLE スマホ連携、WiFi 経由ファーム更新) もこのボードで実現する場合は技適認証品への基板差替を要する
+- LCD / Touch / microSD / GPIO など WiFi 以外の機能は使用 OK
+
+### 配線計画 (5/19 EVK Rev4.1 Schematic + Waveshare 3.4C ボード写真確認済)
+
+| 端点 (2BP) | 信号 | 電圧 | 端点 (ESP32-P4) | 補足 |
+|---|---|---|---|---|
+| **TP48** | QN9090 PIO_8 / USART0_TXD | 3.3V CMOS | **GPIO 47** (UART1 RX) | 主信号 (RADAR 3Mbps) |
+| **TP47** | QN9090 PIO_9 / USART0_RXD | 3.3V CMOS | **GPIO 48** (UART1 TX) | optional, 制御送信用 |
+| GND (TP29 等) | GND | — | GND | 必須 |
+
+**配線番号の罠**: 2BP 側の "TP48" と ESP32-P4 側の "GPIO 48" は別物 (TP48 ↔ GPIO 47 がペア、TP47 ↔ GPIO 48 がペア)。番号が交差するので識別ミスに注意。
+
+ESP32-P4 GPIO 47/48 を選んだ根拠:
+- Waveshare 3.4C の 40 ピン拡張ヘッダ右列で**物理的に隣接**(配線楽)
+- BSP (LCD/Touch/I2S/SD) が使う GPIO (4,6-13,26,27,32,39-44,53) と衝突しない
+- ESP32-P4 GPIO matrix で UART1 を任意 GPIO に割当可能
+
+備考:
+- 以前 Phase 1 で「曲がっていた」TP20 / TP81-87 は SR150 SPI ブレークアウト用 (Path B 想定)、**TP47/TP48 とは別位置で健在**
+- baud = 3 Mbps、QN9090 側は ANSI 色付き ASCII で出力
+- TP47 への送信は Phase 2 後段 (制御プロトコル) で必要、Phase 2 初回は RX のみで OK
+- SWD ピン (TP40/TP41) は QN9090 デバッグ用、ISP_ENTRY (TP36) は dk6prog 書込時のリセット用
+
+---
+
 ### Phase 0: 環境準備 + 校正値バックアップ 【5/11-12】 (大半済)
 
 **目的**: Path C の安全マージン確保。失敗時に元の Murata プリビルド FW に戻せる準備。
