@@ -11,6 +11,7 @@
 #include "uwb/uwb_uart.h"
 #include "uwb/uwb_filter.h"
 #include "game/game_state.h"
+#include "audio/audio_player.h"
 
 static const char *TAG = "dragon-radar";
 
@@ -18,15 +19,20 @@ static void handle_game_event(game_event_t ev)
 {
     switch (ev) {
     case GAME_EV_IN_REACH:
-        ESP_LOGI(TAG, "ball in reach"); break;
+        ESP_LOGI(TAG, "ball in reach");
+        audio_player_cue(AUDIO_CUE_PROXIMITY);
+        break;
     case GAME_EV_COLLECTED:
         ESP_LOGI(TAG, "ball COLLECTED (%u/%u)",
-                 (unsigned)game_get_collected(), (unsigned)DR_GAME_TARGET_BALLS); break;
+                 (unsigned)game_get_collected(), (unsigned)DR_GAME_TARGET_BALLS);
+        audio_player_cue(AUDIO_CUE_COLLECTED);
+        break;
     case GAME_EV_ALL_COLLECTED:
-        ESP_LOGI(TAG, "ALL BALLS COLLECTED -> summoning!"); break;
+        ESP_LOGI(TAG, "ALL BALLS COLLECTED -> summoning!");
+        audio_player_cue(AUDIO_CUE_SUMMON);
+        break;
     default: break;
     }
-    /* Phase 4: trigger audio cues here based on ev */
 }
 
 static void uwb_task(void *arg)
@@ -70,6 +76,7 @@ void app_main(void)
     bsp_display_unlock();
 
     game_init();
+    audio_player_init();
     uwb_uart_init();
     xTaskCreate(uwb_task, "uwb_rx", 4096, NULL, 5, NULL);
 
