@@ -49,7 +49,7 @@ static bool parse_radar_line(const char *line, uwb_measurement_t *out)
     float az_deg = (float)az_i + ((az_i < 0) ? -(az_f / 128.0f) : (az_f / 128.0f));
     float el_deg = (float)el_i + ((el_i < 0) ? -(el_f / 128.0f) : (el_f / 128.0f));
 
-    out->tag_id        = (uint8_t)t;
+    out->tag_id        = (uint8_t)(t + 1);            /* UWB meas index 0-based -> radar_view 1-based */
     out->distance_mm   = (uint16_t)(d * 10);          /* QN9090 reports cm */
     out->azimuth_deg   = (int16_t)az_deg;
     out->elevation_deg = (int16_t)el_deg;

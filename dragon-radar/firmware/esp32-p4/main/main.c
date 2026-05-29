@@ -50,4 +50,10 @@ void app_main(void)
 
     uwb_uart_init();
     xTaskCreate(uwb_task, "uwb_rx", 4096, NULL, 5, NULL);
+
+    /* app_main must NOT return here: doing so tears down the display on this
+     * BSP/LVGL-adapter setup (confirmed 5/19 — static UI vanished without this). */
+    while (1) {
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
 }

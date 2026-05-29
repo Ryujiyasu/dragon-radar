@@ -389,6 +389,27 @@ ESP32 側パース仕様 (Phase 2d で実装):
 - status==0 のみ採用、他は drop
 - ranging timeout = 5 分なので再起動時はリセット必要
 
+### Phase 2d-5 完了 (5/19 夜、実機 + LCD 確認済) ✅
+
+ESP32-P4 GPIO47 ← 2BP TP48 の物理配線で、LCD に光点が出ることを確認。
+全経路成立: `2DK ─UWB→ 2BP/SR150 → QN9090(RADAR ASCII) → UART線 → ESP32 GPIO47 → parser → radar_view → LCD 光点`。
+
+**実装時に踏んだバグ 2 件 (修正済)**
+
+1. **`radar_view_set_tag()` が `tag_id == 0` を早期 return で drop**
+   - QN9090 は `RADAR,t=0` (UWB measurement index は 0-based) を送るが、radar_view は tag_id を 1-based (`s_dots[tag_id-1]`) で扱う設計
+   - 修正: parser (`uwb_uart.c`) で `tag_id = t + 1` に変換
+2. **`app_main` を return させると表示が消える**
+   - この BSP/esp_lvgl_adapter 構成では app_main が return すると static UI ごと消える
+   - 修正: app_main 末尾に `while(1) vTaskDelay` を置いて生かし続ける (Phase 1 にあったものを誤って削除していた)
+
+**運用上の注意 (Phase 3 の FW 再ビルドで解消予定)**
+
+- 2BP のカスタム FW は起動後 **5 分で ranging セッションを閉じて停止**する (`demo_ranging_controller.c` の `delay = 5*60*1000`)。止まったら 2BP をリセット。
+- 2BP をリセットして新セッションを始める時、**2DK が旧セッション/停止状態だとペアし直せない** (RANGE_DATA_NTF は出るが no_of_measurements=0)。
+- **再ペア手順**: ① 2DK を先にリセット (responder を待ち受け状態に) → ②数秒後に 2BP をリセット (controller が listening 中の 2DK を捕捉)。
+- Phase 3 で QN9090 FW を「連続 ranging (無限ループ) + 自動再接続」に作り変えてこの手順を不要にする。
+
 ### 技適制約 (5/19 確定)
 
 Waveshare ESP32-P4-WIFI6-Touch-LCD-3.4C 基板上の ESP32-C6 モジュールに **技適マーク未確認**。
