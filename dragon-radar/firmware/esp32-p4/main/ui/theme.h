@@ -19,6 +19,11 @@
 #define DR_MAX_TAGS         7
 #define DR_RANGE_MAX_MM     10000
 
+/* Game tuning */
+#define DR_COLLECT_THRESH_MM   400   /* ball within 40cm counts as "in reach" */
+#define DR_COLLECT_HOLD_MS     1500  /* must stay in reach this long to collect */
+#define DR_GAME_TARGET_BALLS   2     /* balls needed to summon (set to 7 for Maker Faire) */
+
 /* Bandai Dragon Radar toy reference colors */
 #define DR_COLOR_BG         lv_color_hex(0x2A9040)  /* 鮮やかな緑背景 */
 #define DR_COLOR_GRID       lv_color_hex(0x001008)  /* グリッド線、ほぼ黒 (くっきり) */

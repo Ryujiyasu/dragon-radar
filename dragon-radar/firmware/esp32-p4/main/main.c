@@ -7,10 +7,27 @@
 #include "bsp/display.h"
 
 #include "ui/radar_view.h"
+#include "ui/theme.h"
 #include "uwb/uwb_uart.h"
 #include "uwb/uwb_filter.h"
+#include "game/game_state.h"
 
 static const char *TAG = "dragon-radar";
+
+static void handle_game_event(game_event_t ev)
+{
+    switch (ev) {
+    case GAME_EV_IN_REACH:
+        ESP_LOGI(TAG, "ball in reach"); break;
+    case GAME_EV_COLLECTED:
+        ESP_LOGI(TAG, "ball COLLECTED (%u/%u)",
+                 (unsigned)game_get_collected(), (unsigned)DR_GAME_TARGET_BALLS); break;
+    case GAME_EV_ALL_COLLECTED:
+        ESP_LOGI(TAG, "ALL BALLS COLLECTED -> summoning!"); break;
+    default: break;
+    }
+    /* Phase 4: trigger audio cues here based on ev */
+}
 
 static void uwb_task(void *arg)
 {
@@ -23,9 +40,13 @@ static void uwb_task(void *arg)
             bsp_display_lock(-1);
             radar_view_set_tag(&m);
             bsp_display_unlock();
+            game_on_measurement(&m);
+            handle_game_event(game_poll_event());
             if ((++seen % 10) == 0) {
-                ESP_LOGI(TAG, "tag=%u d=%u mm az=%d el=%d (n=%d)",
-                         m.tag_id, m.distance_mm, m.azimuth_deg, m.elevation_deg, seen);
+                ESP_LOGI(TAG, "tag=%u d=%u mm az=%d el=%d collected=%u (n=%d)",
+                         (unsigned)m.tag_id, (unsigned)m.distance_mm,
+                         m.azimuth_deg, m.elevation_deg,
+                         (unsigned)game_get_collected(), seen);
             }
         }
     }
@@ -48,6 +69,7 @@ void app_main(void)
     radar_view_create(lv_screen_active());
     bsp_display_unlock();
 
+    game_init();
     uwb_uart_init();
     xTaskCreate(uwb_task, "uwb_rx", 4096, NULL, 5, NULL);
 
