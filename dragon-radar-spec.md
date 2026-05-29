@@ -403,12 +403,23 @@ ESP32-P4 GPIO47 ← 2BP TP48 の物理配線で、LCD に光点が出ること�
    - この BSP/esp_lvgl_adapter 構成では app_main が return すると static UI ごと消える
    - 修正: app_main 末尾に `while(1) vTaskDelay` を置いて生かし続ける (Phase 1 にあったものを誤って削除していた)
 
-**運用上の注意 (Phase 3 の FW 再ビルドで解消予定)**
+**運用上の注意**
 
-- 2BP のカスタム FW は起動後 **5 分で ranging セッションを閉じて停止**する (`demo_ranging_controller.c` の `delay = 5*60*1000`)。止まったら 2BP をリセット。
-- 2BP をリセットして新セッションを始める時、**2DK が旧セッション/停止状態だとペアし直せない** (RANGE_DATA_NTF は出るが no_of_measurements=0)。
-- **再ペア手順**: ① 2DK を先にリセット (responder を待ち受け状態に) → ②数秒後に 2BP をリセット (controller が listening 中の 2DK を捕捉)。
-- Phase 3 で QN9090 FW を「連続 ranging (無限ループ) + 自動再接続」に作り変えてこの手順を不要にする。
+- ~~2BP のカスタム FW は起動後 **5 分で ranging セッションを閉じて停止**~~ → **v0.2 で解消** (下記)。
+- 旧 v0.1 の再ペア手順 (参考): ① 2DK を先にリセット → ②数秒後に 2BP をリセット。
+
+**5/29: QN9090 FW v0.2 (連続 ranging 化)**
+
+- `demo_ranging_controller.c` の `delay = 5*60*1000` を `delay = 0xFFFFFFFFUL` に変更 (~49 日 = 実質無限)。
+- セッションを張りっぱなしにすることで、**2DK が一旦切れて戻っても自動で再 join** する → 5分制限と手動再ペアの両方を解消。
+- ビルド済: `firmware-builds/2bp_dragon_radar_v0.2_continuous.bin` (353304 B)。
+
+**⚠️ ISP 書込時は ESP32↔2BP の配線を外すこと (重要)**
+
+- ESP32 の **GPIO48 (UART TX) → 2BP TP47 (QN9090 PIO_9/USART0_RXD)** が繋がっていると、dk6prog の ISP ハンドシェイク (FTDI が PIO_9 経由でコマンド送信) と**競合して timeout**する。
+- 症状: `dk6prog info` が `TimeoutError`、Chip ID が返らない。
+- 対処: 書込前に最低限 **TP47↔GPIO48 線を外す** (安全のため 3 本とも外すか ESP32 電源 OFF)。書込後に戻す。
+- v0.1 書込時に問題なかったのは、当時まだ配線していなかったため。
 
 ### 技適制約 (5/19 確定)
 
