@@ -10,8 +10,12 @@
 
 /* Per-tag sliding window. Azimuth/elevation are averaged as unit vectors
  * (sin/cos) so the result is correct across the +/-180 wrap. Distance uses a
- * plain arithmetic mean. WIN=6 @ ~5 Hz -> ~1.2 s smoothing. */
-#define WIN 6
+ * plain arithmetic mean.
+ *   WIN=6  @ ~5 Hz -> ~1.2 s smoothing (initial; jittery on LCD)
+ *   WIN=12 @ ~5 Hz -> ~2.4 s smoothing (used now; smoother dot, slight lag)
+ * Without Murata's antenna-delay calibration the SR150 itself has ~5-10 cm /
+ * ~2-5 deg residual noise, so the window is what we lean on. */
+#define WIN 12
 
 typedef struct {
     int      count;
