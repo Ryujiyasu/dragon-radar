@@ -49,20 +49,36 @@ DigiKey Make ONE Challenge 2026 / プレイヤー機の 3D プリント筐体。
 ## レンダリング / 書き出し
 
 OpenSCAD GUI で開き、先頭の `part` 変数を切替えてプレビュー。
-CLI での STL / PNG 書き出し例 (このリポジトリで使った AppImage 展開バイナリ):
+印刷用 STL は一括スクリプトで書き出す (生成物は `stl/`、git 管理外):
 
 ```bash
-# 各部品を印刷用 STL に
-for p in bezel body back; do
-  openscad -o dr_$p.stl -D "part=\"$p\"" dragon-radar-enclosure.scad
-done
-
-# 嵌合確認の PNG
-openscad --camera=0,0,-12,62,0,25,300 --imgsize=900,700 \
-  -o assembly.png -D 'part="assembly"' dragon-radar-enclosure.scad
+# PATH に openscad があれば:
+./export-stl.sh
+# AppImage を展開して使う場合:
+OPENSCAD=/path/to/AppRun FN=180 ./export-stl.sh
 ```
 
-`part` の値: `assembly` / `bezel` / `body` / `back` / `board`
+`part` の値: `assembly`(確認) / `bezel` / `body` / `back` / `board`(mock) /
+`coupon_body` / `coupon_bezel` / `coupon`(嵌合確認) / `-D clip=true`(半割り断面)
+
+### スナップ試しクーポン (テストプリント)
+
+`coupon_body` と `coupon_bezel` は嵌合部だけを底側 55° アークで切り出した小片
+(実部品と同一ジオメトリ)。フル印刷の前にこの 2 つを印刷して
+**寸法フィット** (ビードが乗り越える/座る、`fit_gap` の渋さ、リードインの掛かり) を検証する。
+
+- 検証できる: 径方向の嵌め合い・ビード乗り越え・座面
+- 検証しきれない: 全周フープのしなり「カチッ」感 (短アークは実機より硬い) → 最終はベゼル実物で確認
+- 調整する変数: `snap_bead`(0.9) / `fit_gap`(0.3) / `snap_lead`(0.8)
+
+### 印刷の向き (推奨)
+
+| 部品 | 向き | サポート |
+|---|---|---|
+| bezel | 前面を下 (窓側を造形ベッド) | 不要〜軽微。スカート内ビードはオーバーハングだが lead で自立 |
+| body | 開口(前面)を上、バック側を下 | タレットの張り出し下面に少量。トング/溝は縦で良好 |
+| back | 平面を下 | 不要 |
+| coupon | body=トングを上 / bezel=面を下 | 不要 |
 
 ## 寸法の出典と確度
 

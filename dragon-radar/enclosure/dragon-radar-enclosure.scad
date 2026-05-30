@@ -278,6 +278,28 @@ module back_cover() {
 }
 
 // ============================================================================
+//  スナップ試しクーポン (嵌合部だけをアークで切り出した小片)
+//   実部品と同一ジオメトリから intersection で抜くので寸法は常に同期。
+//   タレット(90)/コネクタ(0,20,-25)/ネジボス(45..)を避けた底側 180° を使用。
+// ============================================================================
+coupon_deg  = 55;                 // クーポンの角度幅
+coupon_ctr  = 180;                // 中心角 (-Y, 清浄な壁面)
+coupon_ztop = bezel_face_th + 0.5;
+coupon_zbot = -14;                // 嵌合部が入る高さまで
+
+module sector(deg, r=200) {
+    pts = concat([[0,0]], [for(a=[0:2:deg]) [r*cos(a), r*sin(a)]], [[0,0]]);
+    linear_extrude(height=600, center=true) polygon(pts);
+}
+module coupon_clip() {
+    intersection() {
+        rotate([0,0, coupon_ctr - coupon_deg/2]) sector(coupon_deg);
+        translate([0,0,(coupon_ztop+coupon_zbot)/2])
+            cube([400, 400, coupon_ztop-coupon_zbot], center=true);
+    }
+}
+
+// ============================================================================
 //  ディスパッチ
 // ============================================================================
 module dispatch() {
@@ -290,6 +312,13 @@ module dispatch() {
     } else if (part == "body")  { main_body();
     } else if (part == "back")  { back_cover();
     } else if (part == "board") { board_mock();
+    } else if (part == "coupon_body") {
+        intersection() { main_body();   coupon_clip(); }
+    } else if (part == "coupon_bezel") {
+        intersection() { front_bezel(); coupon_clip(); }
+    } else if (part == "coupon") { // 嵌合確認用に両方を重ねて表示
+        color("LightGray", 0.6) intersection() { main_body();   coupon_clip(); }
+        color("SteelBlue", 0.8) intersection() { front_bezel(); coupon_clip(); }
     }
 }
 
