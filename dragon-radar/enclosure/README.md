@@ -5,6 +5,7 @@ DigiKey Make ONE Challenge 2026 / プレイヤー機の 3D プリント筐体。
 - CAD: **OpenSCAD** (パラメトリック、git 管理)
 - 印刷: **FDM / PLA / ベッド ~220mm** (ø 一体造形、分割なし)
 - ソース: [`dragon-radar-enclosure.scad`](dragon-radar-enclosure.scad)
+- 実測: [`MEASURE.md`](MEASURE.md) — 現物を測って `[MEASURE]/[VERIFY]` を確定する記入シート
 
 ## 現状: v0.4 (エルゴ: フィンガースカラップまで)
 
