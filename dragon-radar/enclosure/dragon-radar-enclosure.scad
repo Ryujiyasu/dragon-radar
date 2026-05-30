@@ -77,7 +77,7 @@ screw_head_h = 2.6;
 boss_dia     = 7.5;
 screw_n      = 4;
 screw_a0     = 45;
-screw_pcd    = inner_dia - boss_dia - 1.0;  // ≈107.7 (後方空洞、壁際)
+screw_pcd    = inner_dia - boss_dia + 3.0;  // ≈111.7 ボスを壁に食い込ませ一体化 (浮き防止)
 
 // ---- ボタン (MKBKLLJY ø12 メタル momentary + 緑LEDリング, 12V) -------------
 //  天面に突出する中空タレットに収める (端子はタレット内、配線のみ内部へ)
@@ -95,6 +95,17 @@ wire_hole_dia    = 5.0;    // 配線通路径
 
 // コネクタ開口の Z (ボタンとは独立)
 conn_z           = -board_stack_th/2; // ≈-7.5
+
+// ---- フィンガースカラップ (親指レスト) -------------------------------------
+//  薄壁(2.4)+内側モジュールのため深掘り不可 → 局所肉盛りレンズに浅い凹みを彫る。
+//  両手持ちの 3/9 時 (0/180°)。空にすれば無効。
+scallop_angles   = [0, 180];
+scallop_z        = -14.5;  // 高さ中央 (ベゼル占有域 z≤-7 より下に収める)
+scallop_h        = 11.0;   // 縦長 (Z方向)。top≈-9 でベゼルと非干渉
+scallop_padR     = 16.0;   // パッド球半径 (footprint 幅を決める)
+scallop_proud    = 3.0;    // 盛り上げ高さ
+scallop_cav_r    = 18.0;   // 凹み(縦シリンダ)半径
+scallop_depth    = 3.0;    // 凹み深さ (パッド頂点から、floor は元壁面付近で薄肉化させない)
 
 echo(str("outer_dia=", outer_dia, "  outer_depth=", outer_depth, "  window_dia=", window_dia));
 
@@ -207,6 +218,31 @@ module turret_wire_cut() {
             cylinder(h=button_z-(-depth_inner-1)+0.1, d=wire_hole_dia);
 }
 
+// ---- フィンガースカラップ ----
+// 肉盛りパッド (空洞を埋めないよう R>=R_in に制限)
+module scallop_pads() {
+    for (a=scallop_angles)
+        rotate([0,0,a])
+            intersection() {
+                hull()
+                    for (zz=[-scallop_h/2, scallop_h/2])
+                        translate([R_out - scallop_padR + scallop_proud, 0, scallop_z+zz])
+                            sphere(r=scallop_padR);
+                // R_in 以上の環状シェルだけ残す
+                difference() {
+                    cylinder(h=4*outer_depth, d=4*outer_dia, center=true);
+                    cylinder(h=4*outer_depth+1, d=inner_dia, center=true);
+                }
+            }
+}
+// 凹み (縦シリンダで親指レストを掘る)
+module scallop_cuts() {
+    for (a=scallop_angles)
+        rotate([0,0,a])
+            translate([R_out + scallop_proud + scallop_cav_r - scallop_depth, 0, scallop_z])
+                cylinder(h=scallop_h+8, r=scallop_cav_r, center=true);
+}
+
 module main_body() {
     difference() {
         union() {
@@ -232,6 +268,8 @@ module main_body() {
             screw_bosses();
             // 天面ボタンタレット (中実エンベロープ)
             turret_envelope(turret_od);
+            // フィンガースカラップの肉盛りパッド
+            scallop_pads();
         }
         // トング外面のスナップ溝
         translate([0,0, snap_z]) groove_solid(R_tongue, snap_bead, snap_h+0.4);
@@ -241,13 +279,15 @@ module main_body() {
                 cylinder(h=snap_lead+0.2, r1=R_tongue, r2=R_tongue);
                 cylinder(h=snap_lead+0.2, r1=R_tongue-snap_lead, r2=R_tongue+0.5);
             }
-        // --- 開口群 (角度は [MEASURE] 仮) ---
-        connector_cutout(0,   10, 4);   // USB-C 仮
-        connector_cutout(20,  10, 4);   // USB-OTG 仮
-        connector_cutout(-25, 13, 3.5); // microSD 仮
+        // --- 開口群 (角度は [MEASURE] 仮、底側にケーブル出し) ---
+        connector_cutout(250, 10, 4);   // USB-C 仮
+        connector_cutout(270, 10, 4);   // USB-OTG 仮
+        connector_cutout(290, 13, 3.5); // microSD 仮
         // 天面タレットの中ぐり + 配線通路
         turret_bore_cut();
         turret_wire_cut();
+        // フィンガースカラップの凹み
+        scallop_cuts();
     }
 }
 
@@ -282,8 +322,8 @@ module back_cover() {
 //   実部品と同一ジオメトリから intersection で抜くので寸法は常に同期。
 //   タレット(90)/コネクタ(0,20,-25)/ネジボス(45..)を避けた底側 180° を使用。
 // ============================================================================
-coupon_deg  = 55;                 // クーポンの角度幅
-coupon_ctr  = 180;                // 中心角 (-Y, 清浄な壁面)
+coupon_deg  = 26;                 // クーポンの角度幅 (空き角に収める)
+coupon_ctr  = 115;                // 中心角 (turret90 と boss135 の間の清浄域)
 coupon_ztop = bezel_face_th + 0.5;
 coupon_zbot = -14;                // 嵌合部が入る高さまで
 
