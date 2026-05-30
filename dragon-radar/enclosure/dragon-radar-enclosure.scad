@@ -79,9 +79,22 @@ screw_n      = 4;
 screw_a0     = 45;
 screw_pcd    = inner_dia - boss_dia - 1.0;  // ≈107.7 (後方空洞、壁際)
 
-// ボタン (MKBKLLJY ø12mm) [上部リム]
-button_dia        = 12.4;
-button_z          = -board_stack_th/2; // 暫定
+// ---- ボタン (MKBKLLJY ø12 メタル momentary + 緑LEDリング, 12V) -------------
+//  天面に突出する中空タレットに収める (端子はタレット内、配線のみ内部へ)
+//  [VERIFY] 現物 (Phase4-5 で配線済) で寸法確定すること
+button_angle     = 90;     // +Y = 天面 (12時方向)
+button_z         = -11.0;  // タレット中心Z (本体壁内に収める)
+button_dia       = 12.3;   // パネル穴 (ø12 + クリアランス)
+turret_bore      = 16.5;   // タレット内径 (ナット/端子逃げ) [VERIFY]
+turret_wall      = 2.6;    // タレット肉厚
+turret_od        = turret_bore + 2*turret_wall; // ≈21.7
+turret_protrude  = 18.0;   // R_out から外への突出長 ≈ ボタン全長-パネル [VERIFY]
+turret_cap_th    = 3.0;    // 端面(パネル)厚 = ボタンのパネル厚 [VERIFY ≤~5]
+turret_clear     = 0.4;    // ベゼル逃げクリアランス
+wire_hole_dia    = 5.0;    // 配線通路径
+
+// コネクタ開口の Z (ボタンとは独立)
+conn_z           = -board_stack_th/2; // ≈-7.5
 
 echo(str("outer_dia=", outer_dia, "  outer_depth=", outer_depth, "  window_dia=", window_dia));
 
@@ -137,6 +150,8 @@ module front_bezel() {
         }
         // 表示窓
         translate([0,0,-0.1]) cylinder(h=bezel_face_th+0.2, d=window_dia);
+        // 天面タレットの逃げ (本体タレットがベゼルを貫通)
+        turret_envelope(turret_od + 2*turret_clear, extra_len=0.1);
     }
 }
 
@@ -158,11 +173,38 @@ module screw_bosses(with_pilot=true) {
 
 module connector_cutout(angle, w, h) {
     rotate([0,0,angle])
-        translate([R_in - 0.1, 0, button_z])
+        translate([R_in - 0.1, 0, conn_z])
             rotate([0,90,0])
                 translate([0,0,-(wall+1)/2])
                     linear_extrude(wall+2)
                         square([h, w], center=true);
+}
+
+// ---- 天面ボタンタレット ----------------------------------------------------
+// 外殻エンベロープ (本体に union / ベゼルに clearance subtract で共用)
+module turret_envelope(d, extra_len=0) {
+    rotate([0,0,button_angle])
+        translate([0, R_in-2, button_z])
+            rotate([-90,0,0])
+                cylinder(h=(R_out+turret_protrude)-(R_in-2)+extra_len, d=d);
+}
+// タレットの中ぐり (メインボア + 端面ボタン穴)
+module turret_bore_cut() {
+    rotate([0,0,button_angle])
+        translate([0, R_in-2, button_z])
+            rotate([-90,0,0]) {
+                // メインボア (内側へ3mm延ばして空洞へ開口)
+                translate([0,0,-3])
+                    cylinder(h=(R_out+turret_protrude)-(R_in-2)-turret_cap_th+3, d=turret_bore);
+                // 端面のパネル穴 (ボタン軸)
+                cylinder(h=(R_out+turret_protrude)-(R_in-2)+0.1, d=button_dia);
+            }
+}
+// 配線通路: タレット内端から後方空洞へ -Z に降ろす (環状隙間を通す)
+module turret_wire_cut() {
+    rotate([0,0,button_angle])
+        translate([0, R_in-1, -depth_inner-1])
+            cylinder(h=button_z-(-depth_inner-1)+0.1, d=wire_hole_dia);
 }
 
 module main_body() {
@@ -188,6 +230,8 @@ module main_body() {
                 }
             // バックカバー用ボス
             screw_bosses();
+            // 天面ボタンタレット (中実エンベロープ)
+            turret_envelope(turret_od);
         }
         // トング外面のスナップ溝
         translate([0,0, snap_z]) groove_solid(R_tongue, snap_bead, snap_h+0.4);
@@ -201,10 +245,9 @@ module main_body() {
         connector_cutout(0,   10, 4);   // USB-C 仮
         connector_cutout(20,  10, 4);   // USB-OTG 仮
         connector_cutout(-25, 13, 3.5); // microSD 仮
-        // ボタン穴 (上部 +Y)
-        rotate([0,0,90])
-            translate([R_in - wall - 1, 0, button_z])
-                rotate([0,90,0]) cylinder(h=wall+3, d=button_dia, center=true);
+        // 天面タレットの中ぐり + 配線通路
+        turret_bore_cut();
+        turret_wire_cut();
     }
 }
 
