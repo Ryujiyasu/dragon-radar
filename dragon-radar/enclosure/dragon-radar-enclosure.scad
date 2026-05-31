@@ -99,11 +99,12 @@ board_screw_head_h = 2.4;
 button_angle     = 90;     // +Y = 天面 (12時方向)
 button_z         = -11.0;  // タレット中心Z (本体壁内に収める)
 button_dia       = 12.3;   // パネル穴 (ø12 + クリアランス)
-turret_bore      = 16.5;   // タレット内径 (ナット/端子逃げ) [VERIFY]
+// 実測 2026-05-31: 全長24 / 頭(押せる部分)1.7 / 頭先端〜ナット下端6mm
+turret_bore      = 16.5;   // タレット内径 (ナット/端子逃げ) [VERIFY: #2 ナット最大径待ち]
 turret_wall      = 2.6;    // タレット肉厚
 turret_od        = turret_bore + 2*turret_wall; // ≈21.7
-turret_protrude  = 18.0;   // R_out から外への突出長 ≈ ボタン全長-パネル [VERIFY]
-turret_cap_th    = 3.0;    // 端面(パネル)厚 = ボタンのパネル厚 [VERIFY ≤~5]
+turret_protrude  = 14.0;   // 突出長。金属取付部を保持、端子+配線(柔)は内部隙間へ逃がす
+turret_cap_th    = 2.0;    // 端面(パネル)厚。頭1.7+パネル+ナット=6 → パネル≤~2 [VERIFY]
 turret_clear     = 0.4;    // ベゼル逃げクリアランス
 wire_hole_dia    = 5.0;    // 配線通路径
 
