@@ -29,14 +29,17 @@ $fn = 120;                 // 最終出力前は 180+ 推奨
 board_glass_dia   = 115.0; // ガラス/前面外形 [確定]
 board_active_dia  = 87.6;  // 有効表示エリア径 [確定]
 board_glass_th    = 6.0;   // 前面ガラス厚 [確定]
-board_stack_th    = 15.0;  // モジュール総厚 [確定]
-board_pcb_dia     = 108.0; // 背面 PCB 外径 [概算]
+board_stack_th    = 14.0;  // モジュール総厚 [実測 2026-05-31]
+// 背面キャリア基板 (四角) [実測 2026-05-31: 65×86]
+carrier_x         = 86.0;  // 長辺
+carrier_y         = 65.0;  // 短辺
+carrier_angle     = 0;     // 長辺の向き (基準=X軸, [MEASURE] 実際の取付向き)
+carrier_th        = board_stack_th - board_glass_th; // ガラス背面〜最深部 ≈8
 
-// マウント穴 [MEASURE]
-mount_count       = 4;
-mount_pcd         = 105.0;
+// マウント穴 (四隅ではない) [MEASURE]
+//   キャリア中心を原点、長辺=X として [x,y] で実測位置を列挙する。
+mount_holes       = [];    // 例: [[30,20],[-30,-20]] 実測で記入
 mount_hole_dia    = 2.5;
-mount_angle0      = 45;
 
 back_clear        = 8.0;   // PCB 背面〜バックカバー内面の隙間 [MEASURE]
 
@@ -129,17 +132,21 @@ module groove_solid(Ro, bead, h) {
 //  ボード mock (嵌合確認用、非印刷)
 // ============================================================================
 module board_mock() {
-    color("DimGray") {
+    // 前面: 丸ディスプレイ (ガラス ø115) + 有効表示
+    color("DimGray")
         translate([0,0,-board_glass_th]) cylinder(h=board_glass_th, d=board_glass_dia);
-        color("Black") translate([0,0,-0.01]) cylinder(h=0.02, d=board_active_dia);
-        translate([0,0,-board_stack_th])
-            cylinder(h=board_stack_th-board_glass_th, d=board_pcb_dia);
-    }
+    color("Black") translate([0,0,-0.01]) cylinder(h=0.02, d=board_active_dia);
+    // 背面: 四角キャリア基板 (65×86)
+    color("DarkGreen")
+        rotate([0,0,carrier_angle])
+            translate([-carrier_x/2, -carrier_y/2, -board_stack_th])
+                cube([carrier_x, carrier_y, carrier_th]);
+    // マウント穴 (実測リスト)
     color("Gold")
-    for (i=[0:mount_count-1])
-        rotate([0,0, mount_angle0 + i*360/mount_count])
-            translate([mount_pcd/2, 0, -board_stack_th])
-                cylinder(h=board_stack_th, d=mount_hole_dia);
+        rotate([0,0,carrier_angle])
+            for (h=mount_holes)
+                translate([h[0], h[1], -board_stack_th])
+                    cylinder(h=carrier_th, d=mount_hole_dia);
 }
 
 // ============================================================================
