@@ -86,6 +86,13 @@ screw_n      = 4;
 screw_a0     = 45;
 screw_pcd    = inner_dia - boss_dia + 3.0;  // ≈111.7 ボスを壁に食い込ませ一体化 (浮き防止)
 
+// ---- ボード固定 (バックカバー→台形マウント穴へ締結) [VERIFY] ----
+//   カラーでボード⇔ディスプレイ締結済の上に、バックから4本でサンドイッチを筐体固定。
+board_screw_dia    = 2.5;   // M2.5 想定 (現物の穴径で確定)
+board_boss_dia     = 6.0;   // 受けボス外径
+board_screw_head   = 5.2;   // 頭ザグリ径
+board_screw_head_h = 2.4;
+
 // ---- ボタン (MKBKLLJY ø12 メタル momentary + 緑LEDリング, 12V) -------------
 //  天面に突出する中空タレットに収める (端子はタレット内、配線のみ内部へ)
 //  [VERIFY] 現物 (Phase4-5 で配線済) で寸法確定すること
@@ -313,15 +320,28 @@ module back_cover() {
             // 本体内側に嵌るリップ
             translate([0,0,back_th-0.01])
                 cylinder(h=3.0, d=inner_dia-2*fit_gap);
+            // ボード固定ボス (前方へ伸び、キャリア背面 z=-14 を受ける)
+            rotate([0,0,carrier_angle])
+                for (h=mount_holes)
+                    translate([h[0], h[1], back_th-0.01])
+                        cylinder(h=depth_inner-board_stack_th, d=board_boss_dia);
         }
-        // ネジ穴: 背面からザグリ + 貫通
+        // 本体閉じ用ネジ穴: 背面からザグリ + 貫通
         for (i=[0:screw_n-1])
             rotate([0,0, screw_a0 + i*360/screw_n])
                 translate([screw_pcd/2, 0, 0]) {
                     translate([0,0,-0.1]) cylinder(h=back_th+3.2, d=screw_dia+0.6);
                     translate([0,0,-0.1]) cylinder(h=screw_head_h, d=screw_head); // 頭ザグリ
                 }
-        // 通気/配線
+        // ボード固定ネジ: 外側からザグリ + ボス内貫通 (先でキャリア穴へ締結)
+        rotate([0,0,carrier_angle])
+            for (h=mount_holes)
+                translate([h[0], h[1], 0]) {
+                    translate([0,0,-0.1])
+                        cylinder(h=back_th+depth_inner-board_stack_th+0.2, d=board_screw_dia+0.5);
+                    translate([0,0,-0.1]) cylinder(h=board_screw_head_h, d=board_screw_head);
+                }
+        // 通気/配線 (ボス位置を避ける)
         for (a=[0:60:359])
             rotate([0,0,a])
                 translate([outer_dia/4,0,-0.1]) cylinder(h=back_th+0.2, d=3);
