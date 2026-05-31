@@ -33,7 +33,7 @@ board_stack_th    = 14.0;  // モジュール総厚 [実測 2026-05-31]
 // 背面キャリア基板 (四角) [実測 2026-05-31: 65×86]
 carrier_x         = 86.0;  // 長辺
 carrier_y         = 65.0;  // 短辺
-carrier_angle     = 0;     // 長辺の向き (基準=X軸, [MEASURE] 実際の取付向き)
+carrier_angle     = 180;   // 取付向き: USB-C(上辺)を筐体底(270°)へ→ USB-A右0/microSD左180
 carrier_th        = board_stack_th - board_glass_th; // ガラス背面〜最深部 ≈8
 
 // マウント穴 (四隅ではない) [MEASURE]
@@ -101,12 +101,12 @@ turret_clear     = 0.4;    // ベゼル逃げクリアランス
 wire_hole_dia    = 5.0;    // 配線通路径
 
 // コネクタ開口の Z (ボタンとは独立)
-conn_z           = -board_stack_th/2; // ≈-7.5
+conn_z           = -(board_glass_th + carrier_th/2); // キャリア深さ中央 ≈-10
 
 // ---- フィンガースカラップ (親指レスト) -------------------------------------
 //  薄壁(2.4)+内側モジュールのため深掘り不可 → 局所肉盛りレンズに浅い凹みを彫る。
 //  両手持ちの 3/9 時 (0/180°)。空にすれば無効。
-scallop_angles   = [0, 180];
+scallop_angles   = [30, 150]; // コネクタ(0/180)を避け上側へ。両手親指位置
 scallop_z        = -14.5;  // 高さ中央 (ベゼル占有域 z≤-7 より下に収める)
 scallop_h        = 11.0;   // 縦長 (Z方向)。top≈-9 でベゼルと非干渉
 scallop_padR     = 16.0;   // パッド球半径 (footprint 幅を決める)
@@ -290,10 +290,10 @@ module main_body() {
                 cylinder(h=snap_lead+0.2, r1=R_tongue, r2=R_tongue);
                 cylinder(h=snap_lead+0.2, r1=R_tongue-snap_lead, r2=R_tongue+0.5);
             }
-        // --- 開口群 (角度は [MEASURE] 仮、底側にケーブル出し) ---
-        connector_cutout(250, 10, 4);   // USB-C 仮
-        connector_cutout(270, 10, 4);   // USB-OTG 仮
-        connector_cutout(290, 13, 3.5); // microSD 仮
+        // --- 開口群 (carrier_angle=180 に対応。角度の微調整は現物合わせ) ---
+        connector_cutout(270, 22, 5.0); // USB-C ×2 (キャリア上辺→筐体底)
+        connector_cutout(0,   11, 6.5); // USB-A OTG (キャリア左辺→筐体右)
+        connector_cutout(180, 14, 3.5); // microSD (キャリア右辺→筐体左)
         // 天面タレットの中ぐり + 配線通路
         turret_bore_cut();
         turret_wire_cut();
