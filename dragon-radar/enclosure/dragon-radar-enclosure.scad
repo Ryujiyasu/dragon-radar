@@ -56,7 +56,7 @@ back_th           = 2.4;   // バックカバー板厚
 
 // 派生
 inner_dia  = board_glass_dia + 2*side_clear;     // 内壁径 ≈116.2
-outer_dia  = inner_dia + 2*wall;                 // 外径 ≈121.0
+outer_dia  = inner_dia + 2*wall;                 // 外径 ≈122.6 (wall=3.2)
 window_dia = board_active_dia + 2*bezel_overlap; // 窓径 ≈91.6
 R_out      = outer_dia/2;
 R_in       = inner_dia/2;
@@ -203,12 +203,12 @@ module screw_bosses(with_pilot=true) {
 }
 
 module connector_cutout(angle, w, h) {
+    // 空洞内(R_in-2)から外周外(R_out+1)まで貫通。壁厚非依存(wall増でも外皮を残さない)
     rotate([0,0,angle])
-        translate([R_in - 0.1, 0, conn_z])
+        translate([R_in - 2, 0, conn_z])
             rotate([0,90,0])
-                translate([0,0,-(wall+1)/2])
-                    linear_extrude(wall+2)
-                        square([h, w], center=true);
+                linear_extrude(R_out - R_in + 3)
+                    square([h, w], center=true);
 }
 
 // ---- 天面ボタンタレット ----------------------------------------------------

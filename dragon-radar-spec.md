@@ -62,10 +62,10 @@ LED は 12V 仕様なので、ESP32 GPIO から MOSFET で 5V (USB-C 5V) を ON/
 - **プレイヤー機 LCD は 1.85" → 3.4" に格上げ決定** (動画映え重視、ESP32-S3 → ESP32-P4 への移行が必要):
   - 旧 1.85" (ESP32-S3-Touch-LCD-1.85) は予備 / Phase 2 検証用に保管
   - 新 3.4" (ESP32-P4-WIFI6-Touch-LCD-3.4C) は 5/4 発注、5/12 頃着想定
-  - 筐体: **外径 ~ø121mm × 厚 ~28mm** (両手持ち or 大人片手、Bandai より大きいが解像度 800×800 で迫力)
-    - 3.4C 実寸: ガラス外形 **ø115** / 有効表示 **ø87.6** / モジュール総厚 ~15mm (Waveshare wiki + CNX で確定。当初「ø110」想定は実機より小さく誤り)
-    - OpenSCAD パラメトリック筐体は [`dragon-radar/enclosure/`](dragon-radar/enclosure/) (v0.1 スケルトン: 前面ベゼル+本体タブ+バックカバー)
-    - マウント穴 PCD・USB/SD リム角度は現物到着後に実測して確定 (`.scad` の `[MEASURE]` 変数)
+  - 筐体: **外径 ~ø122.6mm × 厚 ~26.9mm** (両手持ち or 大人片手、Bandai より大きいが解像度 800×800 で迫力)
+    - 3.4C 実寸(実測確定): 前面=丸ディスプレイ **ø115**(有効 ø87.6) / 背面=四角キャリア **85.5×65** / モジュール総厚 **14**
+    - OpenSCAD パラメトリック筐体は [`dragon-radar/enclosure/`](dragon-radar/enclosure/) (v0.7: 実機適合 + 印刷前多エージェントレビュー済)
+    - マウントネジ4本=上下非対称台形、コネクタ USB-C底/USB-A右/microSD左、天面ボタンタレット、二段締め固定。残は現物合わせ [VERIFY]
   - 移行作業: ESP-IDF target esp32s3→esp32p4、display_init.c (SPI ST77916 → MIPI-DSI)、LVGL 寸法定数 (360 → 800)、半日〜1日工数
 
 ### 9月 Maker Faire 用追加発注 (7月予定)

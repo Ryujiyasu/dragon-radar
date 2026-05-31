@@ -13,7 +13,7 @@ FN="${FN:-180}"   # 出力品質 ($fn)。確認は120、最終は180+
 mkdir -p "$OUT"
 
 # 印刷する部品 (assembly/board/coupon は除外)
-PARTS=(bezel body back coupon_body coupon_bezel)
+PARTS=(bezel body back coupon_body coupon_bezel coupon_button)
 
 for p in "${PARTS[@]}"; do
   echo "==> $p"
