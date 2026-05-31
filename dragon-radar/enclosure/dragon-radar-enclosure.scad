@@ -215,15 +215,15 @@ module connector_cutout(angle, w, h) {
 // 外殻エンベロープ (本体に union / ベゼルに clearance subtract で共用)
 module turret_envelope(d, extra_len=0) {
     rotate([0,0,button_angle])
-        translate([0, R_in-2, button_z])
-            rotate([-90,0,0])
+        translate([R_in-2, 0, button_z])
+            rotate([0,90,0])
                 cylinder(h=(R_out+turret_protrude)-(R_in-2)+extra_len, d=d);
 }
 // タレットの中ぐり (メインボア + 端面ボタン穴)
 module turret_bore_cut() {
     rotate([0,0,button_angle])
-        translate([0, R_in-2, button_z])
-            rotate([-90,0,0]) {
+        translate([R_in-2, 0, button_z])
+            rotate([0,90,0]) {
                 // メインボア (内側へ3mm延ばして空洞へ開口)
                 translate([0,0,-3])
                     cylinder(h=(R_out+turret_protrude)-(R_in-2)-turret_cap_th+3, d=turret_bore);
@@ -234,7 +234,7 @@ module turret_bore_cut() {
 // 配線通路: タレット内端から後方空洞へ -Z に降ろす (環状隙間を通す)
 module turret_wire_cut() {
     rotate([0,0,button_angle])
-        translate([0, R_in-1, -depth_inner-1])
+        translate([R_in-1, 0, -depth_inner-1])
             cylinder(h=button_z-(-depth_inner-1)+0.1, d=wire_hole_dia);
 }
 
@@ -392,6 +392,14 @@ module dispatch() {
     } else if (part == "coupon") { // 嵌合確認用に両方を重ねて表示
         color("LightGray", 0.6) intersection() { main_body();   coupon_clip(); }
         color("SteelBlue", 0.8) intersection() { front_bezel(); coupon_clip(); }
+    } else if (part == "coupon_button") {
+        // 天面タレット周辺を実ジオメトリのまま切り出したボタン嵌合テスト片
+        intersection() {
+            main_body();
+            rotate([0,0, button_angle])
+                translate([(R_in + R_out + turret_protrude)/2, 0, button_z])
+                    cube([(R_out+turret_protrude) - R_in + 20, 34, 30], center=true);
+        }
     }
 }
 
