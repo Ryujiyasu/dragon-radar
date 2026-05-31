@@ -48,7 +48,7 @@ mount_hole_dia    = 2.5;
 back_clear        = 8.0;   // PCB 背面〜バックカバー内面の隙間 [MEASURE]
 
 // ====================== 筐体基本パラメータ ===================================
-wall              = 2.4;   // 側壁厚
+wall              = 3.2;   // 側壁厚 (snap溝がトング壁を貫通しないよう増厚: 旧2.4→3.2)
 side_clear        = 0.6;   // モジュール外周と内壁のクリアランス(片側)
 bezel_overlap     = 2.0;   // ベゼルがガラス前面を抑える掛かり代(径方向)
 bezel_face_th     = 2.5;   // 前面ベゼル板厚
@@ -66,12 +66,12 @@ depth_inner = board_stack_th + back_clear;       // 内寸深さ ≈23
 outer_depth = bezel_face_th + depth_inner + back_th; // 総厚 ≈27.9 (目標30以内)
 
 // ---- 固定方式: ベゼル環状スナップ ------------------------------------------
-skirt_wall  = 2.0;         // ベゼルスカート厚
+skirt_wall  = 1.5;         // ベゼルスカート厚(実厚=skirt_wall-fit_gap)。トング壁を稼ぐため薄く
 tongue_h    = 7.0;         // 本体上端トング高さ (スカートが被る)
 fit_gap     = 0.3;         // トング外面とスカート内面の摺動隙
-R_tongue    = R_out - skirt_wall;        // 本体トング外半径
+R_tongue    = R_out - skirt_wall;        // 本体トング外半径 (=59.8)。トング壁=R_tongue-R_in≈1.7
 R_skirt_in  = R_tongue + fit_gap;        // ベゼルスカート内半径
-snap_bead   = 0.9;         // スナップビード/溝の径方向量
+snap_bead   = 0.7;         // スナップビード/溝の径方向量(溝谷=R_tongue-0.7、残壁≈1.0mm確保)
 snap_h      = 1.6;         // ビード/溝の軸方向高さ
 snap_lead   = 0.8;         // リードイン面取り
 snap_z      = -tongue_h + 3.0;           // ビード/溝の中心Z
@@ -104,7 +104,7 @@ turret_bore      = 16.5;   // タレット内径 (ナット/端子逃げ) [VERIF
 turret_wall      = 2.6;    // タレット肉厚
 turret_od        = turret_bore + 2*turret_wall; // ≈21.7
 turret_protrude  = 14.0;   // 突出長。金属取付部を保持、端子+配線(柔)は内部隙間へ逃がす
-turret_cap_th    = 2.0;    // 端面(パネル)厚。頭1.7+パネル+ナット=6 → パネル≤~2 [VERIFY]
+turret_cap_th    = 1.8;    // 端面(パネル)厚。ナットねじ代の余裕確保(2.0→1.8) [VERIFY]
 turret_clear     = 0.4;    // ベゼル逃げクリアランス
 wire_hole_dia    = 5.0;    // 配線通路径
 
@@ -253,6 +253,9 @@ module scallop_pads() {
                     cylinder(h=4*outer_depth, d=4*outer_dia, center=true);
                     cylinder(h=4*outer_depth+1, d=inner_dia, center=true);
                 }
+                // Z スラブ: 前面(0)/背面(-depth_inner)を突き抜けない様 z∈[-(depth_inner-1),-1]
+                translate([0,0,-depth_inner/2])
+                    cube([4*outer_dia, 4*outer_dia, depth_inner-2], center=true);
             }
 }
 // 凹み (縦シリンダで親指レストを掘る)
@@ -278,8 +281,8 @@ module main_body() {
                     }
                     translate([0,0,-0.1]) cylinder(h=depth_inner+0.2, d=inner_dia);
                 }
-            // 着座シェルフ (ガラス背面を受ける内向きフランジ)
-            translate([0,0,-board_glass_th])
+            // 着座シェルフ (ガラス背面を受ける内向きフランジ。上面=ガラス背面 z=-6)
+            translate([0,0,-board_glass_th-2])
                 difference() {
                     cylinder(h=2, d=inner_dia);
                     translate([0,0,-0.1]) cylinder(h=2.2, d=board_glass_dia-2);
@@ -301,7 +304,7 @@ module main_body() {
             }
         // --- 開口群 (carrier_angle=180 に対応。角度の微調整は現物合わせ) ---
         connector_cutout(270, 22, 5.0); // USB-C ×2 (キャリア上辺→筐体底)
-        connector_cutout(0,   11, 6.5); // USB-A OTG (キャリア左辺→筐体右)
+        connector_cutout(0,   13, 6.5); // USB-A OTG (キャリア左辺→筐体右。プラグ殻12mm+余裕)
         connector_cutout(180, 14, 3.5); // microSD (キャリア右辺→筐体左)
         // 天面タレットの中ぐり + 配線通路
         turret_bore_cut();
