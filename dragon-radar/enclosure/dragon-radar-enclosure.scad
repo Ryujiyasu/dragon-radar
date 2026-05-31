@@ -128,9 +128,10 @@ echo(str("outer_dia=", outer_dia, "  outer_depth=", outer_depth, "  window_dia="
 // ============================================================================
 // 内向きビード: 半径 Ri の内面から軸方向に bead だけ突出 (lead 付き台形)
 module bead_inward(Ri, bead, h, lead) {
+    // 外縁を +0.8 スカート側へ食い込ませ確実に一体化 (面一接触の別ソリッド化を防止)
     rotate_extrude()
-        polygon([[Ri, -h/2-lead], [Ri-bead, -h/2],
-                 [Ri-bead, h/2],   [Ri, h/2+lead]]);
+        polygon([[Ri+0.8, -h/2-lead], [Ri-bead, -h/2],
+                 [Ri-bead, h/2],   [Ri+0.8, h/2+lead]]);
 }
 // 外向き溝(切削体): 半径 Ro の外面を bead だけ凹ませる矩形リング
 module groove_solid(Ro, bead, h) {
