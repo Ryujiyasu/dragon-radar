@@ -47,8 +47,14 @@ mount_hole_dia    = 2.5;
 
 back_clear        = 8.0;   // PCB 背面〜バックカバー内面の隙間 [MEASURE]
 
+// ====================== 製造プロセス プリセット ==============================
+//  "dmm_nylon" = DMM PA12(SLS/MJF) 公差±0.3 向け (保持代/隙間を増し最小壁≥1.0)
+//  "fdm_pla"   = 手元FDM/PLA 向け (タイトめ)
+process = "dmm_nylon";
+nylon = (process == "dmm_nylon");
+
 // ====================== 筐体基本パラメータ ===================================
-wall              = 3.2;   // 側壁厚 (snap溝がトング壁を貫通しないよう増厚: 旧2.4→3.2)
+wall              = nylon ? 3.6 : 3.2; // 側壁厚 (DMMナイロンはトング壁を稼ぐため増厚)
 side_clear        = 0.6;   // モジュール外周と内壁のクリアランス(片側)
 bezel_overlap     = 2.0;   // ベゼルがガラス前面を抑える掛かり代(径方向)
 bezel_face_th     = 2.5;   // 前面ベゼル板厚
@@ -66,12 +72,12 @@ depth_inner = board_stack_th + back_clear;       // 内寸深さ ≈23
 outer_depth = bezel_face_th + depth_inner + back_th; // 総厚 ≈27.9 (目標30以内)
 
 // ---- 固定方式: ベゼル環状スナップ ------------------------------------------
-skirt_wall  = 1.5;         // ベゼルスカート厚(実厚=skirt_wall-fit_gap)。トング壁を稼ぐため薄く
+skirt_wall  = 1.5;         // ベゼルスカート厚(実厚=skirt_wall-fit_gap)
 tongue_h    = 7.0;         // 本体上端トング高さ (スカートが被る)
-fit_gap     = 0.3;         // トング外面とスカート内面の摺動隙
-R_tongue    = R_out - skirt_wall;        // 本体トング外半径 (=59.8)。トング壁=R_tongue-R_in≈1.7
+fit_gap     = nylon ? 0.45 : 0.3;  // 摺動隙 (ナイロンは融着防止+公差で広め)
+R_tongue    = R_out - skirt_wall;        // 本体トング外半径
 R_skirt_in  = R_tongue + fit_gap;        // ベゼルスカート内半径
-snap_bead   = 0.7;         // スナップビード/溝の径方向量(溝谷=R_tongue-0.7、残壁≈1.0mm確保)
+snap_bead   = nylon ? 1.1 : 0.7;   // ビード/溝量。保持代=snap_bead-fit_gap (ナイロン0.65)
 snap_h      = 1.6;         // ビード/溝の軸方向高さ
 snap_lead   = 0.8;         // リードイン面取り
 snap_z      = -tongue_h + 3.0;           // ビード/溝の中心Z
@@ -89,7 +95,7 @@ screw_pcd    = inner_dia - boss_dia + 3.0;  // ≈111.7 ボスを壁に食い込
 // ---- ボード固定 (バックカバー→台形マウント穴へ締結) [VERIFY] ----
 //   カラーでボード⇔ディスプレイ締結済の上に、バックから4本でサンドイッチを筐体固定。
 board_screw_dia    = 2.5;   // M2.5 想定 (現物の穴径で確定)
-board_boss_dia     = 6.0;   // 受けボス外径
+board_boss_dia     = 7.5;   // 受けボス外径 (頭ザグリ周囲に≥1mm壁を残すため太く)
 board_screw_head   = 5.2;   // 頭ザグリ径
 board_screw_head_h = 2.4;
 
@@ -98,7 +104,7 @@ board_screw_head_h = 2.4;
 //  [VERIFY] 現物 (Phase4-5 で配線済) で寸法確定すること
 button_angle     = 90;     // +Y = 天面 (12時方向)
 button_z         = -11.0;  // タレット中心Z (本体壁内に収める)
-button_dia       = 12.3;   // パネル穴 (ø12 + クリアランス)
+button_dia       = nylon ? 12.6 : 12.3; // パネル穴 (ø12 + クリアランス。ナイロンは公差で広め)
 // 実測 2026-05-31: 全長24 / 頭(押せる部分)1.7 / 頭先端〜ナット下端6mm
 turret_bore      = 16.5;   // タレット内径 (ナット/端子逃げ) [VERIFY: #2 ナット最大径待ち]
 turret_wall      = 2.6;    // タレット肉厚
@@ -322,14 +328,14 @@ module back_cover() {
     difference() {
         union() {
             cylinder(h=back_th, d=outer_dia);
-            // 本体内側に嵌るリップ
+            // 本体内側に嵌るリップ (閉じネジ穴外縁との一致=退化を避け -1.5 小さく)
             translate([0,0,back_th-0.01])
-                cylinder(h=3.0, d=inner_dia-2*fit_gap);
-            // ボード固定ボス (前方へ伸び、キャリア背面 z=-14 を受ける)
+                cylinder(h=3.0, d=inner_dia-2*fit_gap-1.5);
+            // ボード固定ボス (プレートを貫通=z0から立ち上げ一体化、キャリア背面z=-14を受ける)
             rotate([0,0,carrier_angle])
                 for (h=mount_holes)
-                    translate([h[0], h[1], back_th-0.01])
-                        cylinder(h=depth_inner-board_stack_th, d=board_boss_dia);
+                    translate([h[0], h[1], 0])
+                        cylinder(h=back_th + depth_inner-board_stack_th, d=board_boss_dia);
         }
         // 本体閉じ用ネジ穴: 背面からザグリ + 貫通
         for (i=[0:screw_n-1])
