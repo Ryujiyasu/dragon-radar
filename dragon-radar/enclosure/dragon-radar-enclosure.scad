@@ -47,14 +47,10 @@ mount_hole_dia    = 2.5;
 
 back_clear        = 8.0;   // PCB 背面〜バックカバー内面の隙間 [MEASURE]
 
-// ====================== 製造プロセス プリセット ==============================
-//  "dmm_nylon" = DMM PA12(SLS/MJF) 公差±0.3 向け (保持代/隙間を増し最小壁≥1.0)
-//  "fdm_pla"   = 手元FDM/PLA 向け (タイトめ)
-process = "dmm_nylon";
-nylon = (process == "dmm_nylon");
-
 // ====================== 筐体基本パラメータ ===================================
-wall              = nylon ? 3.6 : 3.2; // 側壁厚 (DMMナイロンはトング壁を稼ぐため増厚)
+//  素材: DMM ナイロン(PA12 SLS/MJF)。2026-06-03 テスト片で検証:
+//   ボタン穴12.3=ぴったり / スナップ(gap0.3,bead0.7)=きつくて座らない→隙間増+干渉減
+wall              = 3.2;   // 側壁厚 (snap溝がトング壁を貫通しないよう増厚)
 side_clear        = 0.6;   // モジュール外周と内壁のクリアランス(片側)
 bezel_overlap     = 2.0;   // ベゼルがガラス前面を抑える掛かり代(径方向)
 bezel_face_th     = 2.5;   // 前面ベゼル板厚
@@ -74,13 +70,19 @@ outer_depth = bezel_face_th + depth_inner + back_th; // 総厚 ≈27.9 (目標30
 // ---- 固定方式: ベゼル環状スナップ ------------------------------------------
 skirt_wall  = 1.5;         // ベゼルスカート厚(実厚=skirt_wall-fit_gap)
 tongue_h    = 7.0;         // 本体上端トング高さ (スカートが被る)
-fit_gap     = nylon ? 0.45 : 0.3;  // 摺動隙 (ナイロンは融着防止+公差で広め)
+fit_gap     = 0.5;         // 摺動隙。ナイロン公差±0.3で融着/締まり防止(0.3→0.5)
 R_tongue    = R_out - skirt_wall;        // 本体トング外半径
 R_skirt_in  = R_tongue + fit_gap;        // ベゼルスカート内半径
-snap_bead   = nylon ? 1.1 : 0.7;   // ビード/溝量。保持代=snap_bead-fit_gap (ナイロン0.65)
+snap_bead   = 0.8;         // ビード/溝量。乗越/保持代=snap_bead-fit_gap=0.3(座りやすく軽め)
 snap_h      = 1.6;         // ビード/溝の軸方向高さ
-snap_lead   = 0.8;         // リードイン面取り
+snap_lead   = 1.0;         // リードイン面取り(camを軽く: 0.8→1.0)
 snap_z      = -tongue_h + 3.0;           // ビード/溝の中心Z
+// ベゼルスカートをスリットで分割しバネ爪化(「バネ」対策)。snap_slots=0 で無効
+snap_slots  = 12;          // バネ爪の本数
+snap_slot_w = 1.4;         // スリット幅(周方向)
+slot_z_top  = -1.5;        // フィンガー根元を残すZ (face側)
+slot_z_bot  = -(tongue_h + 1.0); // 下端を確実に切る
+snap_groove_h = snap_h + 1.4;    // 溝の軸方向を太く(ビードに遊び=「幅溝を太く」対策)
 
 // ---- バックカバー ネジ (M3 セルフタップ) -----------------------------------
 screw_dia    = 3.0;
@@ -104,7 +106,7 @@ board_screw_head_h = 2.4;
 //  [VERIFY] 現物 (Phase4-5 で配線済) で寸法確定すること
 button_angle     = 90;     // +Y = 天面 (12時方向)
 button_z         = -11.0;  // タレット中心Z (本体壁内に収める)
-button_dia       = nylon ? 12.6 : 12.3; // パネル穴 (ø12 + クリアランス。ナイロンは公差で広め)
+button_dia       = 12.3;   // パネル穴。テスト片で12.3=ぴったり確認(2026-06-03)
 // 実測 2026-05-31: 全長24 / 頭(押せる部分)1.7 / 頭先端〜ナット下端6mm
 turret_bore      = 16.5;   // タレット内径 (ナット/端子逃げ) [VERIFY: #2 ナット最大径待ち]
 turret_wall      = 2.6;    // タレット肉厚
@@ -189,7 +191,19 @@ module front_bezel() {
         translate([0,0,-0.1]) cylinder(h=bezel_face_th+0.2, d=window_dia);
         // 天面タレットの逃げ (本体タレットがベゼルを貫通)
         turret_envelope(turret_od + 2*turret_clear, extra_len=0.1);
+        // バネ爪スリット (スカートを分割して各爪が独立にたわむ)
+        bezel_spring_slots();
     }
+}
+
+// ベゼルスカートを放射スリットで分割しバネ爪化
+module bezel_spring_slots() {
+    if (snap_slots > 0)
+        for (i = [0:snap_slots-1])
+            rotate([0,0, i*360/snap_slots])
+                translate([(R_skirt_in + R_out)/2, 0, (slot_z_top + slot_z_bot)/2])
+                    cube([(R_out - R_skirt_in) + 4, snap_slot_w,
+                          slot_z_top - slot_z_bot], center=true);
 }
 
 // ============================================================================
@@ -300,8 +314,8 @@ module main_body() {
             // フィンガースカラップの肉盛りパッド
             scallop_pads();
         }
-        // トング外面のスナップ溝
-        translate([0,0, snap_z]) groove_solid(R_tongue, snap_bead, snap_h+0.4);
+        // トング外面のスナップ溝 (軸方向を太く=ビードに遊び)
+        translate([0,0, snap_z]) groove_solid(R_tongue, snap_bead, snap_groove_h);
         // トング上端外エッジに camming 面取り
         translate([0,0,-0.01])
             difference() {
@@ -364,8 +378,12 @@ module back_cover() {
 //   実部品と同一ジオメトリから intersection で抜くので寸法は常に同期。
 //   タレット(90)/コネクタ(0,20,-25)/ネジボス(45..)を避けた底側 180° を使用。
 // ============================================================================
-coupon_deg  = 26;                 // クーポンの角度幅 (空き角に収める)
-coupon_ctr  = 115;                // 中心角 (turret90 と boss135 の間の清浄域)
+// 長尺クーポン: バネ爪を複数含めて連続した嵌合感と握りを得る。
+//  ベゼル側が避けるのは turret(90)のみ → 底側へ。本体側は microSD(180,~186.6°)と
+//  USB-C(270,~259.6°)の隙間=186.6〜259.6°(約73°)が連続クリーン、中央に boss(225)1個。
+//  ctr223/deg68 でスリット(210/240)を含み、フィンガー225が完全フリー+前後が半フリー。
+coupon_deg  = 68;                 // クーポンの角度幅 (清浄窓73°に収める)
+coupon_ctr  = 223;                // 中心角 (microSD↔USB-C の隙間、boss225 を中央に)
 coupon_ztop = bezel_face_th + 0.5;
 coupon_zbot = -14;                // 嵌合部が入る高さまで
 
