@@ -48,9 +48,10 @@ mount_hole_dia    = 2.5;
 back_clear        = 8.0;   // PCB 背面〜バックカバー内面の隙間 [MEASURE]
 
 // ====================== 筐体基本パラメータ ===================================
-//  素材: DMM ナイロン(PA12 SLS/MJF)。2026-06-03 テスト片で検証:
-//   ボタン穴12.3=ぴったり / スナップ(gap0.3,bead0.7)=きつくて座らない→隙間増+干渉減
-wall              = 3.2;   // 側壁厚 (snap溝がトング壁を貫通しないよう増厚)
+//  素材: Bambu A1 / PLA Matte (FDM)。2026-06-14 実機クーポンで検証:
+//   薄壁(wall3.2)スナップは爪が薄く(~1.2mm)ビードも浅く保持せず→壁厚化で爪剛性+噛み深さUP
+//   ボタン穴12.3=ぴったり / 嵌合は厚壁版(下記)でカチッと保持を確認
+wall              = 4.4;   // 側壁厚 (トング壁2.2/爪剛性確保。薄壁だとスナップが保持しない)
 side_clear        = 0.6;   // モジュール外周と内壁のクリアランス(片側)
 bezel_overlap     = 2.0;   // ベゼルがガラス前面を抑える掛かり代(径方向)
 bezel_face_th     = 2.5;   // 前面ベゼル板厚
@@ -58,7 +59,7 @@ back_th           = 2.4;   // バックカバー板厚
 
 // 派生
 inner_dia  = board_glass_dia + 2*side_clear;     // 内壁径 ≈116.2
-outer_dia  = inner_dia + 2*wall;                 // 外径 ≈122.6 (wall=3.2)
+outer_dia  = inner_dia + 2*wall;                 // 外径 ≈125.0 (wall=4.4, スナップ強化で増)
 window_dia = board_active_dia + 2*bezel_overlap; // 窓径 ≈91.6
 R_out      = outer_dia/2;
 R_in       = inner_dia/2;
@@ -68,12 +69,12 @@ depth_inner = board_stack_th + back_clear;       // 内寸深さ ≈23
 outer_depth = bezel_face_th + depth_inner + back_th; // 総厚 ≈27.9 (目標30以内)
 
 // ---- 固定方式: ベゼル環状スナップ ------------------------------------------
-skirt_wall  = 1.5;         // ベゼルスカート厚(実厚=skirt_wall-fit_gap)
+skirt_wall  = 2.2;         // ベゼルスカート厚(爪実厚=skirt_wall-fit_gap≈1.9mm。薄いと保持せず)
 tongue_h    = 7.0;         // 本体上端トング高さ (スカートが被る)
-fit_gap     = 0.5;         // 摺動隙。ナイロン公差±0.3で融着/締まり防止(0.3→0.5)
+fit_gap     = 0.30;        // 摺動隙。FDM/PLA実機で確定(2026-06-14)。020/030/040は体感差小=頑丈
 R_tongue    = R_out - skirt_wall;        // 本体トング外半径
 R_skirt_in  = R_tongue + fit_gap;        // ベゼルスカート内半径
-snap_bead   = 0.8;         // ビード/溝量。乗越/保持代=snap_bead-fit_gap=0.3(座りやすく軽め)
+snap_bead   = 1.2;         // ビード/溝量。保持代=snap_bead-fit_gap=0.9(厚壁トングで深く噛む)
 snap_h      = 1.6;         // ビード/溝の軸方向高さ
 snap_lead   = 1.0;         // リードイン面取り(camを軽く: 0.8→1.0)
 snap_z      = -tongue_h + 3.0;           // ビード/溝の中心Z
