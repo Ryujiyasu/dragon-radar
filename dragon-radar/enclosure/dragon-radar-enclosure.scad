@@ -346,11 +346,9 @@ module back_cover() {
             // 本体内側に嵌るリップ (閉じネジ穴外縁との一致=退化を避け -1.5 小さく)
             translate([0,0,back_th-0.01])
                 cylinder(h=3.0, d=inner_dia-2*fit_gap-1.5);
-            // ボード固定ボス (プレートを貫通=z0から立ち上げ一体化、キャリア背面z=-14を受ける)
-            rotate([0,0,carrier_angle])
-                for (h=mount_holes)
-                    translate([h[0], h[1], 0])
-                        cylinder(h=back_th + depth_inner-board_stack_th, d=board_boss_dia);
+            // [提案A 2026-06-15] 基板はディスプレイ側の4スタンドオフで保持され、
+            //   ベゼルがガラス→ディスプレイ→基板を前から押さえる。よってバックは基板に
+            //   締結しない純粋な蓋とする(基板固定ボス/ネジを撤去=穴アラインずれ問題を解消)。
         }
         // 本体閉じ用ネジ穴: 背面からザグリ + 貫通
         for (i=[0:screw_n-1])
@@ -359,15 +357,8 @@ module back_cover() {
                     translate([0,0,-0.1]) cylinder(h=back_th+3.2, d=screw_dia+0.6);
                     translate([0,0,-0.1]) cylinder(h=screw_head_h, d=screw_head); // 頭ザグリ
                 }
-        // ボード固定ネジ: 外側からザグリ + ボス内貫通 (先でキャリア穴へ締結)
-        rotate([0,0,carrier_angle])
-            for (h=mount_holes)
-                translate([h[0], h[1], 0]) {
-                    translate([0,0,-0.1])
-                        cylinder(h=back_th+depth_inner-board_stack_th+0.2, d=board_screw_dia+0.5);
-                    translate([0,0,-0.1]) cylinder(h=board_screw_head_h, d=board_screw_head);
-                }
-        // 通気/配線 (ボス位置を避ける)
+        // (基板固定ネジ穴は撤去 — 提案A。基板はディスプレイ側スタンドオフ保持)
+        // 通気/配線
         for (a=[0:60:359])
             rotate([0,0,a])
                 translate([outer_dia/4,0,-0.1]) cylinder(h=back_th+0.2, d=3);
