@@ -274,9 +274,10 @@ module scallop_pads() {
                     cylinder(h=4*outer_depth, d=4*outer_dia, center=true);
                     cylinder(h=4*outer_depth+1, d=inner_dia, center=true);
                 }
-                // Z スラブ: 前面(0)/背面(-depth_inner)を突き抜けない様 z∈[-(depth_inner-1),-1]
-                translate([0,0,-depth_inner/2])
-                    cube([4*outer_dia, 4*outer_dia, depth_inner-2], center=true);
+                // Z スラブ: 上端をベゼルスカート底(-tongue_h)より下(-tongue_h-2)に抑える。
+                //   旧は上端-1でz=-7..0(ベゼル域)へ肉盛りが侵入→2時/10時でベゼルが被さらなかった。
+                translate([0,0, (-(depth_inner-1) + -(tongue_h+2))/2])
+                    cube([4*outer_dia, 4*outer_dia, (depth_inner-1)-(tongue_h+2)], center=true);
             }
 }
 // 凹み (縦シリンダで親指レストを掘る)
@@ -343,9 +344,10 @@ module back_cover() {
     difference() {
         union() {
             cylinder(h=back_th, d=outer_dia);
-            // 本体内側に嵌るリップ (閉じネジ穴外縁との一致=退化を避け -1.5 小さく)
+            // 本体内側に嵌るリップ。スナグ嵌合(片側0.25)かつネジ穴を完全に内包する径に拡大。
+            //   旧 inner_dia-2*fit_gap-1.5≈114.1 は片側~1mmで緩い+ネジ穴外縁(R57.65)が欠けていた。
             translate([0,0,back_th-0.01])
-                cylinder(h=3.0, d=inner_dia-2*fit_gap-1.5);
+                cylinder(h=3.0, d=inner_dia-0.5);  // ≈115.7 (R57.85): 本体内径116.2に片側0.25
             // [提案A 2026-06-15] 基板はディスプレイ側の4スタンドオフで保持され、
             //   ベゼルがガラス→ディスプレイ→基板を前から押さえる。よってバックは基板に
             //   締結しない純粋な蓋とする(基板固定ボス/ネジを撤去=穴アラインずれ問題を解消)。
