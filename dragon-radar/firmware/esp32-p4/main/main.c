@@ -1,3 +1,5 @@
+#include <math.h>
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
@@ -5,6 +7,7 @@
 
 #include "bsp/esp-bsp.h"
 #include "bsp/display.h"
+#include "bsp/esp32_p4_wifi6_touch_lcd_xc.h"
 
 #include "ui/radar_view.h"
 #include "ui/theme.h"
@@ -12,8 +15,16 @@
 #include "uwb/uwb_filter.h"
 #include "game/game_state.h"
 #include "audio/audio_player.h"
+#include "imu/imu_bno086.h"
 
 static const char *TAG = "dragon-radar";
+
+/* IMU heading -> world-frame azimuth. With the BNO086 the UWB azimuth (device-frame)
+ * is rotated by the device heading so the blip holds its real-world bearing as you
+ * turn the radar. Sign/offset are empirical (IMU mount orientation) - flip if the
+ * blip rotates the wrong way. */
+#define IMU_HEADING_SIGN        (+1.0f)
+#define IMU_HEADING_OFFSET_DEG  (0)
 
 static void handle_game_event(game_event_t ev)
 {
@@ -42,6 +53,16 @@ static void uwb_task(void *arg)
     int seen = 0;
     while (1) {
         if (uwb_uart_recv(&m, 1000)) {
+            float heading = 0.0f;
+            bool have_heading = imu_bno086_get_heading(&heading);
+            if (have_heading) {
+                /* device-frame azimuth -> world frame so the blip is rotation-stable */
+                int wa = (int)lroundf((float)m.azimuth_deg + IMU_HEADING_SIGN * heading)
+                         + IMU_HEADING_OFFSET_DEG;
+                while (wa >= 180) wa -= 360;
+                while (wa < -180) wa += 360;
+                m.azimuth_deg = (int16_t)wa;
+            }
             if (!uwb_filter_apply(&m)) continue;
             bsp_display_lock(-1);
             radar_view_set_tag(&m);
@@ -49,9 +70,10 @@ static void uwb_task(void *arg)
             game_on_measurement(&m);
             handle_game_event(game_poll_event());
             if ((++seen % 10) == 0) {
-                ESP_LOGI(TAG, "tag=%u d=%u mm az=%d el=%d collected=%u (n=%d)",
+                ESP_LOGI(TAG, "tag=%u d=%u mm az=%d el=%d hd=%.0f%s collected=%u (n=%d)",
                          (unsigned)m.tag_id, (unsigned)m.distance_mm,
                          m.azimuth_deg, m.elevation_deg,
+                         heading, have_heading ? "" : "(no-imu)",
                          (unsigned)game_get_collected(), seen);
             }
         }
@@ -74,6 +96,12 @@ void app_main(void)
     bsp_display_lock(-1);
     radar_view_create(lv_screen_active());
     bsp_display_unlock();
+
+    /* IMU shares the BSP I2C bus (touch already brought it up). Optional: if the
+     * BNO086 is absent, init fails gracefully and UWB/touch keep working. */
+    if (imu_bno086_init(bsp_i2c_get_handle()) == ESP_OK) {
+        imu_bno086_start_task();
+    }
 
     game_init();
     audio_player_init();
