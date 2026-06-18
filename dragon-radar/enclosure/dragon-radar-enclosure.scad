@@ -94,6 +94,20 @@ boss_dia     = 7.5;
 screw_n      = 4;
 screw_a0     = 45;
 screw_pcd    = inner_dia - boss_dia + 3.0;  // ≈111.7 ボスを壁に食い込ませ一体化 (浮き防止)
+// バックの「削り不要化」: 嵌合リップ(solid disk)が本体の受けボス(ø7.5)と半径方向で干渉し、
+//   ネジ穴周りを毎回削っていた。リップ側にボス径+余裕の逃げを彫り、貫通にも遊びを持たせる。
+back_screw_hole  = screw_dia + 1.6;   // 貫通クリア ≈4.6 (アライメント遊び)
+back_screw_cbore = screw_head + 1.0;  // 頭ザグリ ≈7.0
+back_boss_clear  = boss_dia + 2.5;    // リップに彫る本体ボス逃げ ≈10.0 (干渉解消=削り不要)
+
+// ---- ピンヘッダ逃がし窓 (バックカバー) -------------------------------------
+//  40ピンヘッダ+ジャンパ(IMU/UWB/ボタン)のコネクタが back_clear=8 を超えて突き当たり
+//  バックが閉まらない問題 → ヘッダ位置(USB-C側=270°)にプレート+リップ貫通の窓を開ける。
+pin_relief       = true;
+pin_relief_angle = 270;   // ヘッダ位置: USB-C側(筐体底)。現物で±微調整可
+pin_relief_w     = 42;    // 周方向(弦)幅: 40ピンヘッダ+コネクタ長
+pin_relief_d     = 17;    // 径方向幅
+pin_relief_rc    = 28;    // 窓中心の半径(ヘッダ列の位置)。外へ寄せるなら増やす
 
 // ---- ボード固定 (バックカバー→台形マウント穴へ締結) [VERIFY] ----
 //   カラーでボード⇔ディスプレイ締結済の上に、バックから4本でサンドイッチを筐体固定。
@@ -352,18 +366,25 @@ module back_cover() {
             //   ベゼルがガラス→ディスプレイ→基板を前から押さえる。よってバックは基板に
             //   締結しない純粋な蓋とする(基板固定ボス/ネジを撤去=穴アラインずれ問題を解消)。
         }
-        // 本体閉じ用ネジ穴: 背面からザグリ + 貫通
+        // 本体閉じ用ネジ穴: 貫通(遊び大) + 頭ザグリ + リップ側に本体ボス逃げ(削り不要化)
         for (i=[0:screw_n-1])
             rotate([0,0, screw_a0 + i*360/screw_n])
                 translate([screw_pcd/2, 0, 0]) {
-                    translate([0,0,-0.1]) cylinder(h=back_th+3.2, d=screw_dia+0.6);
-                    translate([0,0,-0.1]) cylinder(h=screw_head_h, d=screw_head); // 頭ザグリ
+                    translate([0,0,-0.1]) cylinder(h=back_th+3.2, d=back_screw_hole);
+                    translate([0,0,-0.1]) cylinder(h=screw_head_h, d=back_screw_cbore); // 頭ザグリ
+                    // リップ(z=back_th..back_th+3)を本体ボス径+余裕でくり抜く=干渉解消
+                    translate([0,0,back_th-0.1]) cylinder(h=3.2, d=back_boss_clear);
                 }
         // (基板固定ネジ穴は撤去 — 提案A。基板はディスプレイ側スタンドオフ保持)
         // 通気/配線
         for (a=[0:60:359])
             rotate([0,0,a])
                 translate([outer_dia/4,0,-0.1]) cylinder(h=back_th+0.2, d=3);
+        // ピンヘッダ/コネクタ逃がし窓 (USB-C側=270°。プレート+リップを貫通)
+        if (pin_relief)
+            rotate([0,0, pin_relief_angle])
+                translate([pin_relief_rc, 0, (back_th+3)/2])
+                    cube([pin_relief_d, pin_relief_w, back_th+3.4], center=true);
     }
 }
 
