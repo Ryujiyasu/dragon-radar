@@ -9,8 +9,8 @@ $fn = 160;
 // ---- 主要パラメータ ----
 ball_dia    = 70;    // 外径 [mm] (原作 ~75)
 wall        = 2.2;   // 殻厚 (レジンは脆いので2mm以上)
-star_count  = 4;     // 星の数 1..7
-star_d      = 8;     // 星の外径(表面) [mm]
+star_count  = 1;     // 星の数 1..7 (DigiKey Make ONE Challenge → 一星球=1)
+star_d      = 12;    // 星の外径(表面) [mm] (単独星なので大きめで映えさせる)
 star_depth  = 1.0;   // 彫り込み深さ [mm]
 star_spread = 9;     // 星クラスタの広がり(中心オフセット係数)
 lip_h       = 4;     // 接合リップの差し込み高さ
