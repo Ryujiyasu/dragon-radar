@@ -108,6 +108,8 @@ pin_relief_angle = 270;   // ヘッダ位置: USB-C側(筐体底)。現物で±�
 pin_relief_w     = 42;    // 周方向(弦)幅: 40ピンヘッダ+コネクタ長
 pin_relief_d     = 17;    // 径方向幅
 pin_relief_rc    = 28;    // 窓中心の半径(ヘッダ列の位置)。外へ寄せるなら増やす
+pin_relief_ext   = 12;    // 片側(+X/USB-A側「右」)へ追加延長 [mm]。右端X=21+ext=33→右下(315°)ネジ穴の手前まで(ボス逃げ34.5の1.5mm手前)。左端は維持
+pin_relief_off   = pin_relief_ext/2;  // 中心シフト(左端維持で右へ伸ばす)。符号を負にすると左へ伸ばす
 
 // ---- ボード固定 (バックカバー→台形マウント穴へ締結) [VERIFY] ----
 //   カラーでボード⇔ディスプレイ締結済の上に、バックから4本でサンドイッチを筐体固定。
@@ -383,8 +385,8 @@ module back_cover() {
         // ピンヘッダ/コネクタ逃がし窓 (USB-C側=270°。プレート+リップを貫通)
         if (pin_relief)
             rotate([0,0, pin_relief_angle])
-                translate([pin_relief_rc, 0, (back_th+3)/2])
-                    cube([pin_relief_d, pin_relief_w, back_th+3.4], center=true);
+                translate([pin_relief_rc, pin_relief_off, (back_th+3)/2])
+                    cube([pin_relief_d, pin_relief_w + pin_relief_ext, back_th+3.4], center=true);
     }
 }
 
