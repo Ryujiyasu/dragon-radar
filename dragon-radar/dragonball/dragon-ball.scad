@@ -16,7 +16,13 @@ star_spread = 9;     // 星クラスタの広がり(中心オフセット係数)
 lip_h       = 4;     // 接合リップの差し込み高さ
 lip_t       = 1.4;   // リップ肉厚
 lip_gap     = 0.20;  // リップ嵌合クリア(片側)。レジンはタイトめ
-part        = "both";// top / bottom / both / assembly / clip
+part        = "both";// top / bottom / both / assembly / clip / bottom_print / top_print
+
+// 排液/吸盤対策の穴 (ヘッドレス平置き印刷用。最終ボールは false のまま)
+drain_holes      = false;
+drain_hole_d     = 3.5;  // 排液穴径
+drain_hole_n     = 4;    // 穴数
+drain_apex_angle = 45;   // ドーム頂点からの角度(度)。星を避ける
 
 R  = ball_dia/2;
 Ri = R - wall;       // 内半径(空洞)
@@ -69,14 +75,28 @@ module join_lip() {
     }
 }
 
+// 排液穴 (pole: +1=上半球頂点+Z / -1=下半球頂点-Z)。ドーム頂点から drain_apex_angle で穿孔
+module drain_cuts(pole) {
+    for (i = [0:drain_hole_n-1])
+        rotate([0, 0, i*360/drain_hole_n + 45])
+            rotate([0, pole > 0 ? drain_apex_angle : 180 - drain_apex_angle, 0])
+                translate([0, 0, R])
+                    cylinder(h = wall + 6, d = drain_hole_d, center = true);
+}
 module half_top() {   // 星のある側
-    union() {
-        intersection() { shell(); translate([0,0,-0.001]) cylinder(h=R+1, r=R+1); }
-        join_lip();
+    difference() {
+        union() {
+            intersection() { shell(); translate([0,0,-0.001]) cylinder(h=R+1, r=R+1); }
+            join_lip();
+        }
+        if (drain_holes) drain_cuts(1);
     }
 }
 module half_bottom() {
-    intersection() { shell(); translate([0,0,-R-1]) cylinder(h=R+1, r=R+1); }
+    difference() {
+        intersection() { shell(); translate([0,0,-R-1]) cylinder(h=R+1, r=R+1); }
+        if (drain_holes) drain_cuts(-1);
+    }
 }
 
 // ---- 出力 ----
@@ -87,6 +107,10 @@ if (part == "assembly") {
     half_top();
 } else if (part == "bottom") {
     half_bottom();
+} else if (part == "bottom_print") {   // 平置き向き(切断面を下=ベッド、ドーム上)
+    rotate([180,0,0]) half_bottom();
+} else if (part == "top_print") {      // 上半球は自然向きで切断面が下
+    half_top();
 } else if (part == "clip") {        // 断面確認
     intersection() {
         union() { half_bottom(); half_top(); }
