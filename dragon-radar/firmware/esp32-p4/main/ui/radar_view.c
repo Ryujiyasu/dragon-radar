@@ -24,14 +24,21 @@ typedef struct {
 static lv_obj_t   *s_radar_root;
 static lv_obj_t   *s_sweep_arc;
 static lv_obj_t   *s_collected_label;
+static lv_obj_t   *s_range_label;
 static radar_dot_t s_dots[DR_MAX_TAGS];
 static lv_timer_t *s_dummy_timer;
+
+/* Button-cycled display range (zoom), like the original Dragon Radar. */
+static const uint16_t s_ranges[] = {1000, 3000, 10000};   /* 1 m / 3 m / 10 m */
+#define DR_N_RANGES (sizeof(s_ranges) / sizeof(s_ranges[0]))
+static uint8_t s_range_idx = 2;   /* default 10 m (matches prior DR_RANGE_MAX_MM) */
 
 static int32_t distance_to_radius_px(uint16_t distance_mm)
 {
     if (distance_mm == 0) return 0;
-    if (distance_mm >= DR_RANGE_MAX_MM) return DR_RADAR_RING_R2;
-    float ratio = logf(1.0f + (float)distance_mm / 1000.0f) / logf(1.0f + (float)DR_RANGE_MAX_MM / 1000.0f);
+    uint16_t range_mm = s_ranges[s_range_idx];
+    if (distance_mm >= range_mm) return DR_RADAR_RING_R2;
+    float ratio = logf(1.0f + (float)distance_mm / 1000.0f) / logf(1.0f + (float)range_mm / 1000.0f);
     return (int32_t)(DR_RADAR_RING_R2 * ratio);
 }
 
@@ -193,9 +200,25 @@ static void create_dots(lv_obj_t *parent)
 static void create_collected_label(lv_obj_t *parent)
 {
     s_collected_label = lv_label_create(parent);
-    lv_label_set_text(s_collected_label, "0 / 7");
+    lv_label_set_text_fmt(s_collected_label, "BALLS 0 / %u", (unsigned)DR_GAME_TARGET_BALLS);
     lv_obj_set_style_text_color(s_collected_label, DR_COLOR_TEXT, 0);
     lv_obj_align(s_collected_label, LV_ALIGN_TOP_RIGHT, -50, 50);
+}
+
+static void update_range_label(void)
+{
+    if (!s_range_label) return;
+    uint16_t r = s_ranges[s_range_idx];
+    if (r >= 1000) lv_label_set_text_fmt(s_range_label, "RANGE %u m", (unsigned)(r / 1000));
+    else           lv_label_set_text_fmt(s_range_label, "RANGE %u cm", (unsigned)(r / 10));
+}
+
+static void create_range_label(lv_obj_t *parent)
+{
+    s_range_label = lv_label_create(parent);
+    lv_obj_set_style_text_color(s_range_label, DR_COLOR_TEXT, 0);
+    lv_obj_align(s_range_label, LV_ALIGN_TOP_LEFT, 50, 50);
+    update_range_label();
 }
 
 static void dummy_demo_cb(lv_timer_t *t)
@@ -228,6 +251,7 @@ void radar_view_create(lv_obj_t *parent)
     create_dots(s_radar_root);
     draw_center_pointer(s_radar_root);
     create_collected_label(s_radar_root);
+    create_range_label(s_radar_root);
 }
 
 void radar_view_set_tag(const uwb_measurement_t *m)
@@ -254,7 +278,14 @@ void radar_view_remove_tag(uint8_t tag_id)
 void radar_view_set_collected(uint8_t count)
 {
     if (count > DR_MAX_TAGS) count = DR_MAX_TAGS;
-    lv_label_set_text_fmt(s_collected_label, "%u / %u", count, DR_MAX_TAGS);
+    lv_label_set_text_fmt(s_collected_label, "BALLS %u / %u", count, (unsigned)DR_GAME_TARGET_BALLS);
+}
+
+uint16_t radar_view_cycle_range(void)
+{
+    s_range_idx = (uint8_t)((s_range_idx + 1) % DR_N_RANGES);
+    update_range_label();
+    return s_ranges[s_range_idx];
 }
 
 void radar_view_start_dummy_demo(void)

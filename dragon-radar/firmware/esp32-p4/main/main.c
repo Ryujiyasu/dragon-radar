@@ -3,6 +3,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
+#include "driver/gpio.h"
 #include "lvgl.h"
 
 #include "bsp/esp-bsp.h"
@@ -25,6 +26,10 @@ static const char *TAG = "dragon-radar";
  * blip rotates the wrong way. */
 #define IMU_HEADING_SIGN        (+1.0f)
 #define IMU_HEADING_OFFSET_DEG  (0)
+
+/* Front-panel momentary button (active-low, internal pull-up): cycles the radar
+ * display range 1m -> 3m -> 10m, like the original Dragon Radar's zoom. */
+#define BUTTON_GPIO  22
 
 static void handle_game_event(game_event_t ev)
 {
@@ -80,6 +85,36 @@ static void uwb_task(void *arg)
     }
 }
 
+static void button_task(void *arg)
+{
+    (void)arg;
+    gpio_config_t io = {
+        .pin_bit_mask = 1ULL << BUTTON_GPIO,
+        .mode         = GPIO_MODE_INPUT,
+        .pull_up_en   = GPIO_PULLUP_ENABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type    = GPIO_INTR_DISABLE,
+    };
+    gpio_config(&io);
+    int last = 1;
+    while (1) {
+        int v = gpio_get_level(BUTTON_GPIO);
+        if (last == 1 && v == 0) {                    /* falling edge = press */
+            vTaskDelay(pdMS_TO_TICKS(30));            /* debounce */
+            if (gpio_get_level(BUTTON_GPIO) == 0) {
+                bsp_display_lock(-1);
+                uint16_t r = radar_view_cycle_range();  /* zoom: 1m -> 3m -> 10m */
+                bsp_display_unlock();
+                ESP_LOGI(TAG, "button: range -> %u mm", (unsigned)r);
+                audio_player_cue(AUDIO_CUE_PROXIMITY);
+                while (gpio_get_level(BUTTON_GPIO) == 0) vTaskDelay(pdMS_TO_TICKS(20)); /* wait release */
+            }
+        }
+        last = v;
+        vTaskDelay(pdMS_TO_TICKS(20));
+    }
+}
+
 void app_main(void)
 {
     ESP_LOGI(TAG, "Dragon Radar UWB (ESP32-P4 + Waveshare 3.4C) - boot");
@@ -107,6 +142,7 @@ void app_main(void)
     audio_player_init();
     uwb_uart_init();
     xTaskCreate(uwb_task, "uwb_rx", 4096, NULL, 5, NULL);
+    xTaskCreate(button_task, "button", 3072, NULL, 4, NULL);
 
     /* app_main must NOT return here: doing so tears down the display on this
      * BSP/LVGL-adapter setup (confirmed 5/19 — static UI vanished without this). */
