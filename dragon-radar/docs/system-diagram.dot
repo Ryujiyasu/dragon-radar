@@ -1,0 +1,33 @@
+digraph dragon_radar {
+  rankdir=LR;
+  bgcolor="white";
+  label="ドラゴンレーダー システム構成 ─ UWB測距 × IMU方位 × 丸型ディスプレイ";
+  labelloc="t";
+  fontname="Noto Sans CJK JP";
+  fontsize=22;
+  graph [nodesep=0.55, ranksep=1.1, margin=0.25];
+  node  [fontname="Noto Sans CJK JP", fontsize=15, shape=box, style="rounded,filled",
+         penwidth=1.8, margin="0.24,0.16"];
+  edge  [fontname="Noto Sans CJK JP", fontsize=13, penwidth=1.8, color="#455A64", fontcolor="#37474F"];
+
+  ball  [label="ドラゴンボール（樹脂）\nUWBタグ Type2DK (SR040)\nCR2032 コイン電池で自立", fillcolor="#FFB74D", color="#E65100"];
+  radar [label="レーダー本体\nUWB Type2BP (SR150)", fillcolor="#ECEFF1", color="#546E7A"];
+  imu   [label="BNO086 IMU\n方位補正（回しても固定）", fillcolor="#FFF59D", color="#F9A825"];
+  p4    [label="ESP32-P4\nWaveshare 丸型LCD 3.4C\nLVGLでレーダー描画", fillcolor="#BBDEFB", color="#1565C0"];
+  btn   [label="ボタン (GPIO22)\nレンジ 1m / 3m / 10m", fillcolor="#F5F5F5", color="#9E9E9E"];
+  lcd   [label="丸型LCDに光点(blip)\n距離・方位を表示", fillcolor="#C8E6C9", color="#2E7D32"];
+
+  // 列0: ボール ⇅ レーダー（UWB無線リンク）
+  ball  -> radar [dir=both, constraint=false, penwidth=2.8, color="#E65100", fontcolor="#E65100",
+                  label="UWB 双方向測距\n(DS-TWR / AoA)\n距離・方位・仰角"];
+  // 列0 -> 列1（有線UART）
+  radar -> p4    [label="UART 3Mbps"];
+  // 列1内（IMU・ボタンがESP32-P4へ）
+  imu   -> p4    [style=dashed, label="I2C / 方位"];
+  btn   -> p4    [style=dashed, label="ズーム"];
+  // 列1 -> 列2（描画）
+  p4    -> lcd   [label="描画"];
+
+  { rank=same; ball; radar; }
+  { rank=same; imu; p4; btn; }
+}
