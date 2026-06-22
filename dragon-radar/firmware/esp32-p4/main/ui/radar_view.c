@@ -47,7 +47,7 @@ static void polar_to_cartesian(uint16_t distance_mm, int16_t azimuth_deg, int32_
     int32_t r = distance_to_radius_px(distance_mm);
     float az_rad = (float)azimuth_deg * (float)M_PI / 180.0f;
     *out_x = DR_CENTER + (int32_t)(r * sinf(az_rad));
-    *out_y = DR_CENTER - (int32_t)(r * cosf(az_rad));
+    *out_y = DR_CENTER + (int32_t)(r * cosf(az_rad));  /* 上下(前後)反転: 実機表示に合わせcosの符号を反転(左右は不変) */
 }
 
 static void draw_grid(lv_obj_t *parent)
